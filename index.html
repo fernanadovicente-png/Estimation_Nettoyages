@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Estimation Nettoyage</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="blue-bg">
+  <div id="splash" class="splash">
+    <div class="drop"></div>
+    <div class="splash-title">Estimation Nettoyage</div>
+  </div>
+
+  <header>
+    <div class="left">
+      <button id="presetIcon" class="icon-btn" title="Pré-définir pièces" onclick="openPresets()">🔷</button>
+      <div class="brand"><div class="logo-drop"></div><span>Estimation Nettoyage</span></div>
+    </div>
+    <div class="right">
+      <button id="installBtn" class="icon-btn hidden" onclick="promptInstall()" title="Installer l’app">⬇️</button>
+      <select id="langSelect" onchange="setLang(this.value)"><option value="fr">FR</option><option value="en">EN</option></select>
+    </div>
+  </header>
+
+  <main>
+    <div id="firstTip" class="tip hidden" data-i18n="first_tip">💬 Conseil : utilisez le bouton 🔷 pour définir vos pièces personnalisées (une seule fois).</div>
+
+    <section class="card">
+      <div class="row">
+        <label class="flex"><span data-i18n="client">Nom client</span><input type="text" id="clientName" placeholder="Nom du client" /></label>
+        <label class="flex"><span data-i18n="date">Date</span><input type="date" id="cleaningDate" /></label>
+      </div>
+
+      <div class="row">
+        <label class="flex">
+          <span data-i18n="type">Type de nettoyage</span>
+          <div class="type-line">
+            <select id="cleanType" onchange="onTypeChange()">
+              <option value="Fin de chantier">Fin de chantier</option>
+              <option value="Fin de bail (moyen)">Fin de bail (moyen)</option>
+              <option value="Fin de bail (très sale)">Fin de bail (très sale)</option>
+              <option value="Vitres & Stores">Vitres & Stores</option>
+              <option value="Méthodes">Méthodes</option>
+              <option value="Entretien régulier - Administration">Entretien régulier - Administration</option>
+              <option value="Entretien régulier - Hôpital">Entretien régulier - Hôpital</option>
+              <option value="Entretien régulier - Écoles">Entretien régulier - Écoles</option>
+              <option value="Entretien régulier - Résidence">Entretien régulier - Résidence</option>
+              <option value="Entretien régulier - Médico-social">Entretien régulier - Médico-social</option>
+              <option value="__custom__">➕ Ajuster une autre</option>
+            </select>
+          </div>
+        </label>
+      </div>
+
+      <!-- M² + H (affiché pour Méthodes et Entretien régulier) -->
+      <div id="m2hRow" class="row hidden">
+        <label class="flex">
+          <span>Méthode</span>
+          <select id="methodSelect"></select>
+        </label>
+        <label class="flex">
+          <span>M²</span>
+          <input type="number" id="surfaceM2" placeholder="Surface (m²)" step="0.1" min="0" />
+        </label>
+        <label class="flex">
+          <span>H</span>
+          <input type="number" id="manualHours" placeholder="Heures (h)" step="0.01" min="0" />
+        </label>
+      </div>
+
+      <button id="toggleAdjuster" class="toggle-btn" onclick="toggleAdjuster()">+ Ajuster</button>
+      <div id="adjuster" class="adjuster hidden">
+        <div class="pieces-chooser">
+          <h3 data-i18n="pieces">Pièces (pré-definitions)</h3>
+          <div id="standardList" class="standard-list"></div>
+        </div>
+
+        <div class="custom-piece">
+          <h3 data-i18n="add_custom">Ajouter pièce personnalisée</h3>
+          <input type="text" id="customPieceName" placeholder="Nom (ex: Jardin d'hiver)">
+          <input type="number" id="customPieceTime" placeholder="Temps par unité (h)" step="0.01" min="0">
+          <input type="number" id="customPieceQty" placeholder="Quantité" step="1" min="1" value="1">
+          <button class="btn" onclick="addCustomPiece()">Ajouter</button>
+        </div>
+
+        <div class="piece-list-container">
+          <h3 data-i18n="list">Liste des pièces</h3>
+          <ul id="pieceList"></ul>
+        </div>
+      </div>
+
+      <div class="total-section">
+        <h2><span data-i18n="total">Total estimé :</span> <span id="totalHours">0.00</span> h</h2>
+      </div>
+
+      <div class="row">
+        <label class="flex">
+          <span data-i18n="remarks">Remarques :</span>
+          <textarea id="remarks" placeholder="Remarques..."></textarea>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn white" onclick="generatePDF()">PDF</button>
+        <button class="btn white" onclick="resetForm()">Réinitialiser</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="presetsModal" class="modal hidden">
+    <div class="modal-content">
+      <h2 data-i18n="presets_title">Pré-définir pièces</h2>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="Fin de chantier" onclick="switchTab('Fin de chantier')">Fin de chantier</button>
+        <button class="tab-btn" data-tab="Fin de bail (moyen)" onclick="switchTab('Fin de bail (moyen)')">Fin de bail (moyen)</button>
+        <button class="tab-btn" data-tab="Fin de bail (très sale)" onclick="switchTab('Fin de bail (très sale)')">Fin de bail (très sale)</button>
+        <button class="tab-btn" data-tab="Vitres & Stores" onclick="switchTab('Vitres & Stores')">Vitres & Stores</button>
+        <button class="tab-btn" data-tab="Méthodes" onclick="switchTab('Méthodes')">Méthodes</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Administration" onclick="switchTab('Entretien régulier - Administration')">Entretien - Administration</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Hôpital" onclick="switchTab('Entretien régulier - Hôpital')">Entretien - Hôpital</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Écoles" onclick="switchTab('Entretien régulier - Écoles')">Entretien - Écoles</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Résidence" onclick="switchTab('Entretien régulier - Résidence')">Entretien - Résidence</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Médico-social" onclick="switchTab('Entretien régulier - Médico-social')">Entretien - Médico-social</button>
+      </div>
+
+      <div id="presetList" class="preset-list"></div>
+      <div class="preset-add">
+        <input type="text" id="presetName" placeholder="Nom pièce (ex: Cuisine)">
+        <input type="number" id="presetTime" placeholder="Temps (h)" step="0.01" min="0">
+        <input type="number" id="presetM2" class="hidden" placeholder="M² (ex: 300)" step="0.1" min="0">
+        <button class="btn" onclick="addPreset()">Ajouter</button>
+      </div>
+      <div class="separator"></div>
+      <div class="custom-type">
+        <h3>➕ <span data-i18n="add_type">Créer un type personnalisé</span></h3>
+        <div class="row">
+          <input type="text" id="newTypeName" placeholder="Ex: Nettoyage vitres">
+          <button class="btn" onclick="createCustomType()">Créer</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button onclick="savePresets()" class="btn white">Enregistrer</button>
+        <button onclick="closePresets()" class="btn white">Fermer</button>
+        <button onclick="clearAllPresets()" class="btn white danger">Effacer tout presets</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="script.js"></script>
+  <script>
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault();
+      deferredPrompt=e;
+      document.getElementById('installBtn').classList.remove('hidden');
+    });
+    function promptInstall(){
+      if(deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('installBtn').classList.add('hidden'); }); }
+      else alert('Install not available here. Deploy over HTTPS.');
+    }
+    window.addEventListener('load', ()=>{ setTimeout(()=>document.getElementById('splash').classList.add('hide'), 1800); });
+  </script>
+</body>
+</html>
