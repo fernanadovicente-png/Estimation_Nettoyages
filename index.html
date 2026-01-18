@@ -19,6 +19,7 @@
       <div class="brand"><div class="logo-drop"></div><span>Estimation Nettoyage</span></div>
     </div>
     <div class="right">
+      <button id="infoBtn" class="icon-btn" onclick="openInfo()" title="Comment ça marche ?">ℹ️</button>
       <button id="installBtn" class="icon-btn hidden" onclick="promptInstall()" title="Installer l’app">⬇️</button>
       <select id="langSelect" onchange="setLang(this.value)"><option value="fr">FR</option><option value="en">EN</option></select>
     </div>
@@ -39,8 +40,8 @@
           <div class="type-line">
             <select id="cleanType" onchange="onTypeChange()">
               <option value="Fin de chantier">Fin de chantier</option>
-              <option value="Fin de bail (moyen)">Fin de bail (moyen)</option>
-              <option value="Fin de bail (très sale)">Fin de bail (très sale)</option>
+              <option value="Fin de bail -">Fin de bail -</option>
+              <option value="Fin de bail +">Fin de bail +</option>
               <option value="Vitres & Stores">Vitres & Stores</option>
               <option value="Méthodes">Méthodes</option>
               <option value="Entretien régulier - Administration">Entretien régulier - Administration</option>
@@ -54,20 +55,16 @@
         </label>
       </div>
 
-      <!-- M² + H (affiché pour Méthodes et Entretien régulier) -->
-      <div id="m2hRow" class="row hidden">
-        <label class="flex">
-          <span>Méthode</span>
-          <select id="methodSelect"></select>
-        </label>
-        <label class="flex">
-          <span>M²</span>
-          <input type="number" id="surfaceM2" placeholder="Surface (m²)" step="0.1" min="0" />
-        </label>
-        <label class="flex">
-          <span>H</span>
-          <input type="number" id="manualHours" placeholder="Heures (h)" step="0.01" min="0" />
-        </label>
+      <!-- Méthodes / Entretien : plusieurs lignes (Surface / M² = H) -->
+      <div id="m2hRow" class="hidden">
+        <div class="m2h-header">
+          <strong id="m2hTitle">Méthodes</strong>
+          <button class="btn white small" type="button" onclick="addM2HLine()">➕ Ajouter</button>
+        </div>
+        <div id="m2hLines" class="m2h-lines"></div>
+        <div class="m2h-note">
+          <small>H = Surface / M² (ex: 600 / 300 = 2h)</small>
+        </div>
       </div>
 
       <button id="toggleAdjuster" class="toggle-btn" onclick="toggleAdjuster()">+ Ajuster</button>
@@ -93,6 +90,10 @@
 
       <div class="total-section">
         <h2><span data-i18n="total">Total estimé :</span> <span id="totalHours">0.00</span> h</h2>
+        <div class="team-line">
+          <label class="team-label">Équipe :</label>
+          <span id="teamCalc"><span id="teamTotal">0.00</span> / <input id="hoursPerPerson" class="team-input" type="number" min="0" step="0.1" value="9"> = <span id="teamPeople">0.00</span></span>
+        </div>
       </div>
 
       <div class="row">
@@ -114,8 +115,8 @@
       <h2 data-i18n="presets_title">Pré-définir pièces</h2>
       <div class="tabs">
         <button class="tab-btn active" data-tab="Fin de chantier" onclick="switchTab('Fin de chantier')">Fin de chantier</button>
-        <button class="tab-btn" data-tab="Fin de bail (moyen)" onclick="switchTab('Fin de bail (moyen)')">Fin de bail (moyen)</button>
-        <button class="tab-btn" data-tab="Fin de bail (très sale)" onclick="switchTab('Fin de bail (très sale)')">Fin de bail (très sale)</button>
+        <button class="tab-btn" data-tab="Fin de bail -" onclick="switchTab('Fin de bail -')">Fin de bail -</button>
+        <button class="tab-btn" data-tab="Fin de bail +" onclick="switchTab('Fin de bail +')">Fin de bail +</button>
         <button class="tab-btn" data-tab="Vitres & Stores" onclick="switchTab('Vitres & Stores')">Vitres & Stores</button>
         <button class="tab-btn" data-tab="Méthodes" onclick="switchTab('Méthodes')">Méthodes</button>
         <button class="tab-btn" data-tab="Entretien régulier - Administration" onclick="switchTab('Entretien régulier - Administration')">Entretien - Administration</button>
@@ -144,6 +145,23 @@
         <button onclick="savePresets()" class="btn white">Enregistrer</button>
         <button onclick="closePresets()" class="btn white">Fermer</button>
         <button onclick="clearAllPresets()" class="btn white danger">Effacer tout presets</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="infoModal" class="modal hidden">
+    <div class="modal-content">
+      <h2>ℹ️ Comment ça marche ?</h2>
+      <div class="info-text">
+        <p><strong>1)</strong> Choisis le type d’intervention (Fin de chantier / Fin de bail - / Fin de bail + / etc.).</p>
+        <p><strong>2)</strong> Ajoute des pièces avec <strong>+ Ajuster</strong> (ou via les pré-définitions 🔷).</p>
+        <p><strong>3)</strong> Pour <strong>Méthodes</strong> et <strong>Entretien régulier</strong> : sélectionne un nom + sa capacité (M²) puis saisis la <strong>surface</strong>.
+           Le temps est calculé automatiquement : <em>H = Surface / M²</em> (ex: 600 / 300 = 2h). Tu peux aussi saisir H manuellement.</p>
+        <p><strong>4)</strong> Génère le PDF avec le bouton <strong>PDF</strong>.</p>
+        <p><strong>Dans le PDF</strong> : client, date, type, liste des pièces et total (heures), remarques.</p>
+      </div>
+      <div class="modal-actions">
+        <button onclick="closeInfo()" class="btn white">Fermer</button>
       </div>
     </div>
   </div>

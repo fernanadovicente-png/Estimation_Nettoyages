@@ -4,8 +4,8 @@ let lang=localStorage.getItem('est_lang')||'fr';function setLang(l){lang=l;local
 function translateAll(){document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(i18n[lang]&&i18n[lang][k])el.textContent=i18n[lang][k];});$('langSelect').value=lang;$('clientName').placeholder=(lang==='fr'?'Nom du client':'Client name');$('remarks').placeholder=(lang==='fr'?'Remarques...':'Remarks...');}translateAll();
 const defaultPresets={
   "Fin de chantier":[{name:"Cuisine",time:3},{name:"Salle de bain",time:2},{name:"WC",time:0.5},{name:"Salon / Séjour",time:2.5},{name:"Chambre",time:1.8},{name:"Fenêtres",time:0.5}],
-  "Fin de bail (moyen)":[{name:"Cuisine",time:4},{name:"Salle de bain",time:3},{name:"WC",time:1.5},{name:"Salon / Séjour",time:3},{name:"Chambre",time:2},{name:"Fenêtres",time:0.4}],
-  "Fin de bail (très sale)":[{name:"Cuisine",time:6},{name:"Salle de bain",time:4.5},{name:"WC",time:2},{name:"Salon / Séjour",time:4.2},{name:"Chambre",time:2.8},{name:"Fenêtres",time:0.55}],
+  "Fin de bail -":[{name:"Cuisine",time:4},{name:"Salle de bain",time:3},{name:"WC",time:1.5},{name:"Salon / Séjour",time:3},{name:"Chambre",time:2},{name:"Fenêtres",time:0.4}],
+  "Fin de bail +":[{name:"Cuisine",time:6},{name:"Salle de bain",time:4.5},{name:"WC",time:2},{name:"Salon / Séjour",time:4.2},{name:"Chambre",time:2.8},{name:"Fenêtres",time:0.55}],
 
   // Nouveaux types (vides par défaut — tu ajoutes tes pièces/temps dans Paramètres)
   "Vitres & Stores":[],
@@ -16,7 +16,36 @@ const defaultPresets={
   "Entretien régulier - Résidence":[],
   "Entretien régulier - Médico-social":[]
 };
-function loadPresets(){const raw=localStorage.getItem('est_presets_v4');if(raw){try{return JSON.parse(raw);}catch(e){}}localStorage.setItem('est_presets_v4',JSON.stringify(defaultPresets));return JSON.parse(localStorage.getItem('est_presets_v4'));}
+
+function migrateLegacyKeys(obj){
+  // Renomme les anciens noms pour éviter d'afficher "très sale" au client.
+  if(obj && typeof obj==='object'){
+    if(obj["Fin de bail (moyen)"] && !obj["Fin de bail -"]){
+      obj["Fin de bail -"]=obj["Fin de bail (moyen)"];
+      delete obj["Fin de bail (moyen)"];
+    }
+    if(obj["Fin de bail (très sale)"] && !obj["Fin de bail +"]){
+      obj["Fin de bail +"]=obj["Fin de bail (très sale)"];
+      delete obj["Fin de bail (très sale)"];
+    }
+  }
+  return obj;
+}
+
+function loadPresets(){
+  const raw=localStorage.getItem('est_presets_v4');
+  if(raw){
+    try{
+      const parsed=migrateLegacyKeys(JSON.parse(raw));
+      // Ajoute les clés manquantes sans écraser l'existant.
+      Object.keys(defaultPresets).forEach(k=>{ if(!(k in parsed)) parsed[k]=defaultPresets[k]; });
+      localStorage.setItem('est_presets_v4',JSON.stringify(parsed));
+      return parsed;
+    }catch(e){}
+  }
+  localStorage.setItem('est_presets_v4',JSON.stringify(defaultPresets));
+  return JSON.parse(localStorage.getItem('est_presets_v4'));
+}
 let presets=loadPresets();
 
 function isM2HTypeForPresets(t){
@@ -132,11 +161,96 @@ function createCustomType(){const name=$('newTypeName').value.trim();if(!name)re
 let pieces=[];let total=0;
 function toggleAdjuster(){const a=$('adjuster');const b=$('toggleAdjuster');a.classList.toggle('hidden');b.textContent=a.classList.contains('hidden')?'+ Ajuster':'- Ajuster';}
 function isM2HType(t){return t==='Méthodes' || (t||'').startsWith('Entretien régulier');}
+
+// ================================
+// ✅ Méthodes / Entretien : plusieurs lignes
+// H = Surface / M² (capacité)
+// ================================
+function m2hOptionsForType(t){
+  return (presets[t]||[]).map(p=>normalizePresetItem(t,p)).filter(p=>p.name);
+}
+
+function ensureOneM2HLine(){
+  const c=$('m2hLines');
+  if(!c) return;
+  if(!c.children.length) addM2HLine();
+}
+
+function addM2HLine(){
+  const c=$('m2hLines');
+  if(!c) return;
+
+  const line=document.createElement('div');
+  line.className='m2h-line';
+  line.innerHTML=`
+    <select class="m2h-method"></select>
+    <input class="m2h-surface" type="number" min="0" step="0.1" placeholder="Surface (m²)">
+    <input class="m2h-hours" type="number" readonly placeholder="H">
+    <button class="m2h-del" type="button" title="Supprimer">🗑️</button>
+  `;
+
+  line.querySelector('.m2h-del').addEventListener('click', ()=>{
+    line.remove();
+    ensureOneM2HLine();
+    updateTotal();
+  });
+  line.querySelector('.m2h-method').addEventListener('change', ()=>{ updateM2HLine(line); updateTotal(); });
+  line.querySelector('.m2h-surface').addEventListener('input', ()=>{ updateM2HLine(line); updateTotal(); });
+
+  c.appendChild(line);
+  refreshMethodSelect();
+  updateM2HLine(line);
+  updateTotal();
+}
+
+function updateM2HLine(line){
+  const t=$('cleanType')?.value||'';
+  if(!isM2HType(t)) return;
+  const sel=line.querySelector('.m2h-method');
+  const surf=line.querySelector('.m2h-surface');
+  const out=line.querySelector('.m2h-hours');
+  if(!sel||!surf||!out) return;
+
+  const opts=m2hOptionsForType(t);
+  const picked=opts.find(o=>o.name===sel.value);
+  const surface=parseFloat(surf.value||'0')||0;
+  const cap=picked ? (parseFloat(picked.m2)||0) : 0;
+
+  const h = (surface>0 && cap>0) ? (surface / cap) : 0;
+  out.value = h>0 ? h.toFixed(2) : '';
+}
+
+function getM2HExtraItems(){
+  const t=$('cleanType')?.value||'';
+  if(!isM2HType(t)) return [];
+  const c=$('m2hLines');
+  if(!c) return [];
+  const opts=m2hOptionsForType(t);
+  return Array.from(c.children).map(line=>{
+    const sel=line.querySelector('.m2h-method');
+    const surf=line.querySelector('.m2h-surface');
+    const out=line.querySelector('.m2h-hours');
+    const name=sel?.value||'';
+    const picked=opts.find(o=>o.name===name);
+    const surface=parseFloat(surf?.value||'0')||0;
+    const cap=picked ? (parseFloat(picked.m2)||0) : 0;
+    const h=(surface>0 && cap>0) ? (surface/cap) : 0;
+    return {name, surface, cap, hours:+(h||0)};
+  }).filter(it=>it.name && it.surface>0 && it.hours>0);
+}
+
+function extraHours(){
+  return getM2HExtraItems().reduce((s,it)=>s+it.hours,0);
+}
+
 function toggleM2H(){
   const t=$('cleanType').value;
   const row=$('m2hRow');
   if(!row) return;
   row.classList.toggle('hidden', !isM2HType(t));
+  const title=$('m2hTitle');
+  if(title) title.textContent = t==='Méthodes' ? 'Méthodes' : 'Entretien régulier';
+  if(isM2HType(t)) ensureOneM2HLine();
   refreshMethodSelect();
   updateTotal();
 }
@@ -169,60 +283,38 @@ function renderStandardList(){
 function addStandard(i){const arr=currentArr();const p=arr[i];if(!p)return;const items=document.querySelectorAll('.std-item');let qty=1;items.forEach(it=>{if(it.querySelector('.std-name').textContent===p.name){qty=parseInt(it.querySelector('.qty').value)||1;}});pieces.push({name:p.name,timePerUnit:p.time,qty:qty,subtotal:+(p.time*qty).toFixed(2)});updateList();}
 function addCustomPiece(){const name=$('customPieceName').value.trim();const time=parseFloat($('customPieceTime').value);const qty=parseInt($('customPieceQty').value)||1;if(!name||isNaN(time))return alert('Nom et temps valides requis');pieces.push({name,timePerUnit:time,qty:qty,subtotal:+(time*qty).toFixed(2)});$('customPieceName').value='';$('customPieceTime').value='';$('customPieceQty').value='1';updateList();}
 function updateList(){const list=$('pieceList');list.innerHTML='';total=0;pieces.forEach((p,i)=>{total+=p.subtotal;const li=document.createElement('li');li.innerHTML=`<div><strong>${p.name}</strong><br><small>${p.timePerUnit}h × ${p.qty} = ${p.subtotal}h</small></div><div class='piece-actions'><button onclick='quickEdit(${i})'>✏️</button><button onclick='removePiece(${i})'>🗑️</button></div>`;list.appendChild(li);});updateTotal();}
-let manualHoursEdited=false;
-
-function selectedMethod(){
-  const t=$('cleanType')?.value||'';
-  if(!isM2HType(t)) return null;
-  const id=$('methodSelect')?.value||'';
-  const arr=(presets[t]||[]).map(p=>normalizePresetItem(t,p)).filter(p=>p.name);
-  return arr.find(p=>p.name===id) || null;
-}
-
-function computedHoursFromM2(){
-  const t=$('cleanType')?.value||'';
-  if(!isM2HType(t)) return 0;
-  const m2=parseFloat($('surfaceM2')?.value||'0');
-  const m=selectedMethod();
-  if(!m || !(m.m2>0) || !(m2>0)) return 0;
-  return +(m2 / m.m2);
-}
-
-function extraHours(){
-  const t=$('cleanType')?.value||'';
-  if(!isM2HType(t)) return 0;
-  const h=parseFloat($('manualHours')?.value||'0');
-  if(!isNaN(h) && h>0) return h;
-  return computedHoursFromM2();
-}
-
-function syncComputedHours(){
-  const t=$('cleanType')?.value||'';
-  if(!isM2HType(t)) return;
-  const autoH=computedHoursFromM2();
-  const input=$('manualHours');
-  if(!input) return;
-  // Si l'utilisateur n'a pas touché au champ H, on met à jour automatiquement.
-  if(!manualHoursEdited){
-    input.value = autoH>0 ? autoH.toFixed(2) : '';
-  }
-}
 function updateTotal(){
   const base=+pieces.reduce((s,p)=>s+p.subtotal,0);
   const ex=extraHours();
-  $('totalHours').textContent=(base+ex).toFixed(2);
+  const totalH=(base+ex);
+  $('totalHours').textContent=totalH.toFixed(2);
+  // Équipe = Total / heures par personne (sans arrondir)
+  const hpp=parseFloat($('hoursPerPerson')?.value||'0')||0;
+  const people = (hpp>0) ? (totalH / hpp) : 0;
+  if($('teamTotal')) $('teamTotal').textContent=totalH.toFixed(2);
+  if($('teamPeople')) $('teamPeople').textContent=people.toFixed(2);
 }
 function quickEdit(i){const p=pieces[i];const q=parseInt(prompt('Quantité',p.qty));const t=parseFloat(prompt('Temps unitaire (h)',p.timePerUnit));if(isNaN(q)||isNaN(t))return;p.qty=q;p.timePerUnit=t;p.subtotal=+(q*t).toFixed(2);updateList();}
 function removePiece(i){pieces.splice(i,1);updateList();}
-function resetForm(){if(!confirm('Réinitialiser la session actuelle?'))return;pieces=[];total=0;$('clientName').value='';$('cleaningDate').value='';$('remarks').value='';if($('surfaceM2'))$('surfaceM2').value='';if($('manualHours'))$('manualHours').value='';updateList();toggleM2H();}
+function resetForm(){
+  if(!confirm('Réinitialiser la session actuelle?'))return;
+  pieces=[];total=0;
+  $('clientName').value='';
+  $('cleaningDate').value='';
+  $('remarks').value='';
+  // Réinitialise les lignes Méthodes/Entretien (sans toucher aux paramètres)
+  const c=$('m2hLines');
+  if(c) c.innerHTML='';
+  updateList();
+  toggleM2H();
+}
 function generatePDF(){
   const name=$('clientName').value||'';
   const date=$('cleaningDate').value||'';
   const type=$('cleanType').value||'';
   const remarks=$('remarks').value||'';
-  const surf=parseFloat($('surfaceM2')?.value||'0');
-  const meth=selectedMethod();
-  const exH=extraHours();
+  const exItems=getM2HExtraItems();
+  const exH=exItems.reduce((s,it)=>s+it.hours,0);
   if(!(window.jspdf&&window.jspdf.jsPDF))return alert('PDF library not available');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
@@ -232,13 +324,9 @@ function generatePDF(){
   doc.text((lang==='fr'?'Client':'Client')+': '+name,14,32);
   doc.text('Date: '+date,90,32);
   doc.text((lang==='fr'?'Type':'Type')+': '+type,14,39);
-  if(isM2HType(type) && (surf>0 || exH>0)){
-    const info=[];
-    if(meth && meth.name) info.push(`Méthode: ${meth.name}`);
-    if(surf>0) info.push(`M²: ${surf}`);
-    if(exH>0) info.push(`H: ${exH}`);
+  if(isM2HType(type) && exItems.length){
     doc.setFontSize(10);
-    doc.text(info.join('   |   '),14,46);
+    doc.text(`${type} : ${exItems.length} ligne(s)`,14,46);
   }
 
   let y=52;
@@ -258,15 +346,16 @@ function generatePDF(){
     y+=7;
   });
 
-  // Ajoute une ligne "Forfait heures" si H manuel est rempli
-  if(exH>0){
+  // Ajoute les lignes Méthodes / Entretien (Surface / M²)
+  exItems.forEach(it=>{
     if(y>270){doc.addPage();y=20;}
-    doc.text('Forfait heures',14,y);
-    doc.text(String(exH),90,y);
+    const label = `${type}: ${it.name} (${it.surface} m²)`;
+    doc.text(label,14,y);
+    doc.text(String(it.hours.toFixed(2)),90,y);
     doc.text('1',130,y);
-    doc.text(String(exH.toFixed(2)),170,y,{align:'right'});
+    doc.text(String(it.hours.toFixed(2)),170,y,{align:'right'});
     y+=7;
-  }
+  });
 
   const totalH=(+pieces.reduce((s,p)=>s+p.subtotal,0) + exH).toFixed(2);
   if(y>250){doc.addPage();y=20;}
@@ -287,47 +376,53 @@ function generatePDF(){
 window.addEventListener('load',()=>{
   renderStandardList();
   toggleM2H();
-  $('manualHours')?.addEventListener('input', ()=>{
-    const v=parseFloat($('manualHours')?.value||'0');
-    // Si l'utilisateur efface (ou met 0), on repasse en auto-calcul
-    if(isNaN(v) || v<=0){
-      manualHoursEdited=false;
-      syncComputedHours();
-    } else {
-      manualHoursEdited=true;
-    }
-    updateTotal();
-  });
-  $('surfaceM2')?.addEventListener('input', ()=>{ manualHoursEdited=false; syncComputedHours(); updateTotal(); });
-  $('methodSelect')?.addEventListener('change', ()=>{ manualHoursEdited=false; syncComputedHours(); updateTotal(); });
+  $('hoursPerPerson')?.addEventListener('input', updateTotal);
+  // Les lignes Méthodes/Entretien se gèrent via addM2HLine() (listeners attachés par ligne)
 });
 
 function refreshMethodSelect(){
   const t=$('cleanType')?.value||'';
-  const sel=$('methodSelect');
-  if(!sel) return;
+  const c=$('m2hLines');
+  if(!c) return;
   if(!isM2HType(t)){
-    sel.innerHTML='';
+    c.innerHTML='';
     return;
   }
-  const arr=(presets[t]||[]).map(p=>normalizePresetItem(t,p)).filter(p=>p.name && p.m2>0);
-  const current=sel.value;
-  sel.innerHTML='';
-  if(!arr.length){
-    const opt=document.createElement('option');
-    opt.value='';
-    opt.textContent=lang==='fr'?'(ajoute des méthodes via 🔷)':'(add methods via 🔷)';
-    sel.appendChild(opt);
-  } else {
-    arr.forEach(p=>{
-      const opt=document.createElement('option');
-      opt.value=p.name;
-      opt.textContent=`${p.name} (${p.m2} m²)`;
-      sel.appendChild(opt);
-    });
-    // restore selection if possible
-    const found=arr.find(p=>p.name===current);
-    if(found) sel.value=current;
-  }
-  syncComputedHours();
+  const opts=m2hOptionsForType(t);
+  const lines=Array.from(c.children);
+  lines.forEach(line=>{
+    const sel=line.querySelector('.m2h-method');
+    if(!sel) return;
+    const current=sel.value;
+    sel.innerHTML='';
+    if(!opts.length){
+      const o=document.createElement('option');
+      o.value='';
+      o.textContent=lang==='fr'?'(ajoute via 🔷)':'(add via 🔷)';
+      sel.appendChild(o);
+    }else{
+      const o0=document.createElement('option');
+      o0.value='';
+      o0.textContent=lang==='fr'?'Choisir...':'Choose...';
+      sel.appendChild(o0);
+      opts.forEach(p=>{
+        const opt=document.createElement('option');
+        opt.value=p.name;
+        opt.textContent=`${p.name} (${p.m2||0} m²)`;
+        sel.appendChild(opt);
+      });
+      if(current && opts.find(o=>o.name===current)) sel.value=current;
+    }
+    updateM2HLine(line);
+  });
+}
+
+// ================================
+// ℹ️ Modal "Comment ça marche"
+// ================================
+function openInfo(){
+  $('infoModal')?.classList.remove('hidden');
+}
+function closeInfo(){
+  $('infoModal')?.classList.add('hidden');
 }
