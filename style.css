@@ -61,6 +61,41 @@ textarea{min-height:80px}
 @media (max-width:720px){.m2h-line{flex-direction:column;align-items:stretch}.m2h-line .m2h-hours{max-width:none}}
 .splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--blue);z-index:99;transition:opacity .4s ease}
 .splash.hide{opacity:0;pointer-events:none}
+
+/* =============================
+   ✅ Bibliothèque (modal 🔷)
+   ============================= */
+.biblio-wrap{margin:10px 0}
+.biblio-grid{display:flex;gap:12px}
+.biblio-left{width:38%;min-width:160px;border:1px solid #eee;border-radius:12px;padding:10px;background:#fff}
+.biblio-right{flex:1;border:1px solid #eee;border-radius:12px;padding:10px;background:#fff}
+.biblio-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.biblio-cats .b-cat{display:flex;gap:6px;margin:6px 0}
+.biblio-cats button{flex:1;text-align:left;padding:10px;border:1px solid #ddd;background:#fff;border-radius:10px}
+.biblio-cats button.active{font-weight:700}
+.biblio-items .b-item{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid #ddd;border-radius:10px;padding:10px;margin-bottom:8px;background:#fff}
+.biblio-items .b-item .left{display:flex;flex-direction:column}
+.biblio-items .b-item small{opacity:.7}
+.btn.small{padding:6px 10px;font-size:12px;border-radius:10px}
+
+/* =============================
+   ✅ Page principale : catégories (click-to-open)
+   ============================= */
+.std-cat{border:1px solid #eee;border-radius:12px;padding:10px;margin:10px 0;background:#fff}
+.std-cat-title{cursor:pointer;list-style:none}
+.std-cat-title::-webkit-details-marker{display:none}
+.std-cat-inner{margin-top:10px}
+
+/* ✅ Vitres & Stores : Unités + M² */
+.vitres-wrap{margin-top:10px}
+.vitres-grid{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:700px){.vitres-grid{grid-template-columns:1fr 1fr}}
+.vbox{border:1px solid #eee;border-radius:12px;padding:10px;background:#fff}
+.vbox h4{margin:0 0 8px 0}
+.vbox select{width:100%;margin-bottom:8px}
+.vrow{display:flex;gap:8px}
+.vrow > *{flex:1}
+.vitres-actions{display:flex;justify-content:flex-end;margin-top:10px}
 .drop{width:64px;height:84px;border-radius:32px 32px 40px 40px;background:#fff;position:relative;animation:bounce 1.2s ease infinite}
 .drop::after{content:'';position:absolute;top:-14px;left:22px;width:12px;height:18px;border-radius:50%;background:#fff}
 .splash-title{margin-top:12px;color:#fff;font-weight:800;letter-spacing:.4px}
