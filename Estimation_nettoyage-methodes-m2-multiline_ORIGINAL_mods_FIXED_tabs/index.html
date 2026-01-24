@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#339CFF" />
+  <title>Estimation Nettoyage</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="./icons/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="./icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/icon-180.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="blue-bg">
+  <div id="splash" class="splash">
+    <div class="drop"></div>
+    <div class="splash-title">Estimation Nettoyage</div>
+  </div>
+
+  <header>
+    <div class="left">
+      <button id="presetIcon" class="icon-btn" data-i18n-title="t_predefine" title="Pré-définir pièces" onclick="openPresets()">🔷</button>
+      <div class="brand"><div class="logo-drop"></div><span>Estimation Nettoyage</span></div>
+    </div>
+    <div class="right">
+      <button id="infoBtn" class="icon-btn" onclick="openInfo()" data-i18n-title="t_info" title="Comment ça marche ?">ℹ️</button>
+      <button id="typesBtn" class="icon-btn" onclick="openTypeManager()" data-i18n-title="t_types" title="Gestion des types">⚙️</button>
+      <button id="installBtn" class="icon-btn hidden" onclick="promptInstall()" data-i18n-title="t_install" title="Installer l’app">⬇️</button>
+      <select id="langSelect" onchange="setLang(this.value)"><option value="fr">FR</option><option value="en">EN</option><option value="de">DE</option></select>
+    </div>
+  </header>
+
+  <main>
+    <nav class="subnav">
+      <button class="btn white small" type="button" onclick="openTypeManager()" data-i18n="sub_types">⚙️ Gestion des types</button>
+    </nav>
+    <div id="firstTip" class="tip hidden" data-i18n="first_tip">💬 Conseil : utilisez le bouton 🔷 pour définir vos pièces personnalisées (une seule fois).</div>
+
+    <section class="card">
+      <div class="row">
+        <label class="flex"><span data-i18n="client">Nom client</span><input type="text" id="clientName" data-i18n-placeholder="ph_client" placeholder="Nom du client" /></label>
+        <label class="flex"><span data-i18n="date">Date</span><input type="date" id="cleaningDate" /></label>
+      </div>
+
+      <div class="row">
+        <label class="flex">
+          <span data-i18n="type">Type de nettoyage</span>
+          <div class="type-line">
+            <select id="cleanType" onchange="onTypeChange()">
+              <option value="Fin de chantier">Fin de chantier</option>
+              <option value="Fin de bail -">Fin de bail -</option>
+              <option value="Fin de bail +">Fin de bail +</option>
+              <option value="Vitres & Stores">Vitres & Stores</option>
+              <option value="Méthodes">Méthodes</option>
+              <option value="Entretien régulier - Administration">Entretien régulier - Administration</option>
+              <option value="Entretien régulier - Hôpital">Entretien régulier - Hôpital</option>
+              <option value="Entretien régulier - Écoles">Entretien régulier - Écoles</option>
+              <option value="Entretien régulier - Résidence">Entretien régulier - Résidence</option>
+              <option value="Entretien régulier - Médico-social">Entretien régulier - Médico-social</option>
+              <option value="__custom__">➕ Ajuster une autre</option>
+            </select>
+<select id="globalCoefSelect" class="hidden"></select>
+          </div>
+        </label>
+      </div>
+
+      <!-- Méthodes / Entretien : plusieurs lignes (Surface / M² = H) -->
+      <div id="m2hRow" class="hidden">
+        <div class="m2h-header">
+          <strong id="m2hTitle">Méthodes</strong>
+          <button class="btn white small" type="button" onclick="addM2HLine()" data-i18n="btn_add">➕ Ajouter</button>
+        </div>
+        <div id="m2hLines" class="m2h-lines"></div>
+        <div class="m2h-note">
+          <small>H = Surface / M² (ex: 600 / 300 = 2h)</small>
+        </div>
+      </div>
+
+      <button id="toggleAdjuster" class="toggle-btn" onclick="toggleAdjuster()" data-i18n="btn_adjust">+ Ajuster</button>
+      <div id="adjuster" class="adjuster hidden">
+        <div class="pieces-chooser">
+          <h3 data-i18n="pieces">Pièces (pré-definitions)</h3>
+
+          <!-- ✅ Vitres & Stores : Unités + M² (avec difficulté) -->
+          <div id="vitresWrap" class="vitres-wrap hidden">
+            <div class="vitres-grid">
+              <div class="vbox">
+                <h4>Unités</h4>
+                <select id="vit_u_preset"></select>
+                <input id="vit_u_time" type="number" step="0.01" min="0" placeholder="Temps par unité (h)">
+                <div class="vrow">
+                  <input id="vit_u_norm" type="number" step="1" min="0" placeholder="Quantité normale">
+                  <input id="vit_u_diff" type="number" step="1" min="0" placeholder="Quantité difficile">
+                </div>
+                <select id="vit_u_coef">
+                  <option value="0">Difficulté 0%</option>
+                  <option value="0.2">Difficulté 20%</option>
+                  <option value="0.3">Difficulté 30%</option>
+                </select>
+              </div>
+
+              <div class="vbox">
+                <h4>M²</h4>
+                <select id="vit_m2_preset"></select>
+                <input id="vit_m2_cap" type="number" step="0.1" min="0" placeholder="Capacité (m²/h)">
+                <div class="vrow">
+                  <input id="vit_m2_norm" type="number" step="0.1" min="0" placeholder="M² normal">
+                  <input id="vit_m2_diff" type="number" step="0.1" min="0" placeholder="M² difficile">
+                </div>
+                <select id="vit_m2_coef">
+                  <option value="0">Difficulté 0%</option>
+                  <option value="0.2">Difficulté 20%</option>
+                  <option value="0.3">Difficulté 30%</option>
+                </select>
+              </div>
+            </div>
+            <div class="vitres-actions">
+              <button class="btn" type="button" onclick="addVitresToSession()" data-i18n="btn_add_session" data-i18n="btn_add_session">Ajouter à la session</button>
+            </div>
+          </div>
+
+          <div id="standardList" class="standard-list"></div>
+        </div>
+
+        <div class="custom-piece">
+          <h3 data-i18n="add_custom">Ajouter pièce personnalisée</h3>
+          <input type="text" id="customPieceName" data-i18n-placeholder="ph_custom_name" placeholder="Nom (ex: Jardin d'hiver)">
+          <input type="number" id="customPieceTime" data-i18n-placeholder="ph_custom_time" placeholder="Temps par unité (h)" step="0.01" min="0">
+          <input type="number" id="customPieceQty" data-i18n-placeholder="ph_custom_qty" placeholder="Quantité" step="1" min="1" value="1">
+          <button class="btn" onclick="addCustomPiece()" data-i18n="btn_add_plain">Ajouter</button>
+        </div>
+
+        <div class="piece-list-container">
+          <h3 data-i18n="list">Liste des pièces</h3>
+          <ul id="pieceList"></ul>
+        </div>
+      </div>
+
+      <div class="total-section">
+        <h2><span data-i18n="total">Total estimé :</span> <span id="totalHours">0.00 (0:00h)</span></h2>
+        <div class="team-line">
+          <label class="team-label" data-i18n="team">Équipe :</label>
+          <span id="teamCalc"><span id="teamTotal">0.00 (0:00h)</span> / <input id="hoursPerPerson" class="team-input" type="number" min="0" step="0.1" value="9"> = <span id="teamPeople">0.00</span></span>
+        </div>
+      </div>
+
+      <div class="row">
+        <label class="flex">
+          <span data-i18n="remarks">Remarques :</span>
+          <textarea id="remarks" data-i18n-placeholder="ph_remarks" placeholder="Remarques..."></textarea>
+        </label>
+      </div>
+
+      <div class="actions">
+        <button class="btn white" onclick="generatePDF()" data-i18n="btn_pdf">PDF</button>
+        <button class="btn white" onclick="resetForm()" data-i18n="btn_reset">Réinitialiser</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="presetsModal" class="modal hidden">
+    <div class="modal-content">
+      <h2 data-i18n="presets_title">Pré-définir pièces</h2>
+      <div class="tabs" id="presetTabs">
+        <button class="tab-btn active" data-tab="Fin de chantier" onclick="switchTab('Fin de chantier')">Fin de chantier</button>
+        <button class="tab-btn" data-tab="Fin de bail -" onclick="switchTab('Fin de bail -')">Fin de bail -</button>
+        <button class="tab-btn" data-tab="Fin de bail +" onclick="switchTab('Fin de bail +')">Fin de bail +</button>
+        <button class="tab-btn" data-tab="Vitres & Stores" onclick="switchTab('Vitres & Stores')">Vitres & Stores</button>
+        <button class="tab-btn" data-tab="Méthodes" onclick="switchTab('Méthodes')">Méthodes</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Administration" onclick="switchTab('Entretien régulier - Administration')">Entretien - Administration</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Hôpital" onclick="switchTab('Entretien régulier - Hôpital')">Entretien - Hôpital</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Écoles" onclick="switchTab('Entretien régulier - Écoles')">Entretien - Écoles</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Résidence" onclick="switchTab('Entretien régulier - Résidence')">Entretien - Résidence</button>
+        <button class="tab-btn" data-tab="Entretien régulier - Médico-social" onclick="switchTab('Entretien régulier - Médico-social')">Entretien - Médico-social</button>
+      </div>
+
+      <!-- ✅ Bibliothèque (catégories) : uniquement pour Fin de chantier / Fin de bail - / Fin de bail + -->
+      <div id="biblioWrap" class="biblio-wrap hidden">
+        <div class="biblio-grid">
+          <div class="biblio-left">
+            <div class="biblio-head">
+              <strong>Bibliothèque</strong>
+              <button class="btn small" type="button" onclick="biblioAddCategory()">+ Catégorie</button>
+            </div>
+            <div id="biblioCats" class="biblio-cats"></div>
+          </div>
+
+          <div class="biblio-right">
+            <div class="biblio-head">
+              <strong id="biblioCatTitle">—</strong>
+              <button class="btn small" type="button" onclick="biblioAddItem()">+ Item</button>
+            </div>
+            <div id="biblioItems" class="biblio-items"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="presetList" class="preset-list"></div>
+      <div class="preset-add">
+        <input type="text" id="presetName" data-i18n-placeholder="res_piece_name_ph" placeholder="Nom pièce (ex: Cuisine)">
+        <select id="presetKind" class="hidden">
+          <option value="unit">Unités</option>
+          <option value="m2">M²/h</option>
+        </select>
+        <input type="number" id="presetTime" data-i18n-placeholder="res_piece_time_ph" placeholder="Temps (h)" step="0.01" min="0">
+        <input type="number" id="presetM2" class="hidden" placeholder="M² (ex: 300)" step="0.1" min="0">
+        <button class="btn" onclick="addPreset()" data-i18n="btn_add_plain">Ajouter</button>
+      </div>
+
+      <!-- ✅ Entretien - Résidence : pièces unitaires (en plus des lignes M² sur la page principale) -->
+      <div id="resPiecesWrap" class="hidden">
+        <div class="separator"></div>
+        <h3>Entretien - Résidence : Pièces (unités)</h3>
+        <div id="resPieceList" class="preset-list"></div>
+        <div class="preset-add">
+          <input type="text" id="resPieceName" data-i18n-placeholder="res_piece_name_ph" placeholder="Nom pièce (ex: Cuisine)">
+          <input type="number" id="resPieceTime" data-i18n-placeholder="res_piece_time_ph" placeholder="Temps (h)" step="0.01" min="0">
+          <button class="btn" type="button" onclick="addResidencePiecePreset()"><span data-i18n="btn_add">Ajouter</span></button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button onclick="savePresets()" class="btn white" data-i18n="btn_save">Enregistrer</button>
+        <button onclick="closePresets()" class="btn white" data-i18n="close">Fermer</button>
+        <button onclick="clearAllPresets()" class="btn white danger" data-i18n="btn_clear_all">Effacer tout presets</button>
+      </div>
+    </div>
+  </div>
+
+  
+<div id="typesModal" class="modal hidden">
+  <div class="modal-content modal-scroll">
+    <div class="modal-head">
+      <h2 data-i18n="tm_title">⚙️ Gestion des types</h2>
+      <button class="btn white small" type="button" onclick="closeTypeManager()" data-i18n="close">Fermer</button>
+    </div>
+
+    <div class="type-manager">
+      <div class="type-create">
+        <h3 data-i18n="tm_create_h">➕ Créer un type</h3>
+        <div class="row">
+          <input type="text" id="tm_name" data-i18n-placeholder="tm_name_ph" placeholder="Ex: Restaurant">
+          <select id="tm_template">
+            <option value="vitres" data-i18n="tm_tpl_vitres">Modèle 2 blocs (comme Vitres)</option>
+            <option value="m2h" data-i18n="tm_tpl_m2h">Méthodes / Entretien (Surface / M²)</option>
+            <option value="pieces_biblio" data-i18n="tm_tpl_biblio">Pièces (bibliothèque)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="tm_opt_pieces" checked> <span data-i18n="tm_opt_pieces">Pièces (bloc gauche)</span></label>
+          <label class="check"><input type="checkbox" id="tm_opt_m2" checked> <span data-i18n="tm_opt_m2">M²/h (bloc droite)</span></label>
+          <label class="check"><input type="checkbox" id="tm_opt_coef" checked> <span data-i18n="tm_opt_coef">Coef %</span></label>
+        </div>
+        <div class="row">
+          <input type="number" id="tm_coef" step="1" min="0" data-i18n-placeholder="tm_coef_ph" placeholder="Coef % (ex: 20)">
+          <input type="number" id="tm_d1" step="1" min="0" data-i18n-placeholder="tm_d1_ph" placeholder="Difficulté 1 % (ex: 20)">
+          <input type="number" id="tm_d2" step="1" min="0" data-i18n-placeholder="tm_d2_ph" placeholder="Difficulté 2 % (ex: 30)">
+        </div>
+        <button class="btn" type="button" onclick="tmCreate()" data-i18n="tm_btn_create">Créer</button>
+      </div>
+
+      <div class="separator"></div>
+
+      <div>
+        <h3 data-i18n="tm_existing_h">Types existants</h3>
+        <div id="tm_list" class="tm-list"></div>
+        <small data-i18n="tm_hint">💡 Désactiver = disparaît du menu, mais reste enregistré.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="infoModal" class="modal hidden">
+  <div class="modal-content info-modal">
+    <div class="modal-head">
+      <h2 data-i18n="info_h">ℹ️ Guide – Comment remplir (Pièces + m²/h)</h2>
+      <button onclick="closeInfo()" class="btn white small" type="button" data-i18n="close">Fermer</button>
+    </div>
+    <div id="infoContent" data-i18n-html="info_html"></div>
+
+    <div class="modal-actions">
+      <button onclick="closeInfo()" class="btn white" data-i18n="close">Fermer</button>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="script.js"></script>
+  <script>
+    if('serviceWorker' in navigator){
+      navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    }
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e)=>{
+      e.preventDefault();
+      deferredPrompt=e;
+      document.getElementById('installBtn').classList.remove('hidden');
+    });
+    function promptInstall(){
+      if(deferredPrompt){ deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('installBtn').classList.add('hidden'); }); }
+      else alert('Install not available here. Deploy over HTTPS.');
+    }
+    window.addEventListener('load', ()=>{ setTimeout(()=>document.getElementById('splash').classList.add('hide'), 1800); });
+  </script>
+</body>
+</html>
