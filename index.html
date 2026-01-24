@@ -20,12 +20,16 @@
     </div>
     <div class="right">
       <button id="infoBtn" class="icon-btn" onclick="openInfo()" title="Comment ça marche ?">ℹ️</button>
+      <button id="typesBtn" class="icon-btn" onclick="openTypeManager()" title="Gestion des types">⚙️</button>
       <button id="installBtn" class="icon-btn hidden" onclick="promptInstall()" title="Installer l’app">⬇️</button>
       <select id="langSelect" onchange="setLang(this.value)"><option value="fr">FR</option><option value="en">EN</option></select>
     </div>
   </header>
 
   <main>
+    <nav class="subnav">
+      <button class="btn white small" type="button" onclick="openTypeManager()">⚙️ Gestion des types</button>
+    </nav>
     <div id="firstTip" class="tip hidden" data-i18n="first_tip">💬 Conseil : utilisez le bouton 🔷 pour définir vos pièces personnalisées (une seule fois).</div>
 
     <section class="card">
@@ -51,6 +55,7 @@
               <option value="Entretien régulier - Médico-social">Entretien régulier - Médico-social</option>
               <option value="__custom__">➕ Ajuster une autre</option>
             </select>
+<select id="globalCoefSelect" class="hidden"></select>
           </div>
         </label>
       </div>
@@ -128,10 +133,10 @@
       </div>
 
       <div class="total-section">
-        <h2><span data-i18n="total">Total estimé :</span> <span id="totalHours">0.00</span> h</h2>
+        <h2><span data-i18n="total">Total estimé :</span> <span id="totalHours">0.00 (0:00h)</span></h2>
         <div class="team-line">
           <label class="team-label">Équipe :</label>
-          <span id="teamCalc"><span id="teamTotal">0.00</span> / <input id="hoursPerPerson" class="team-input" type="number" min="0" step="0.1" value="9"> = <span id="teamPeople">0.00</span></span>
+          <span id="teamCalc"><span id="teamTotal">0.00 (0:00h)</span> / <input id="hoursPerPerson" class="team-input" type="number" min="0" step="0.1" value="9"> = <span id="teamPeople">0.00</span></span>
         </div>
       </div>
 
@@ -152,7 +157,7 @@
   <div id="presetsModal" class="modal hidden">
     <div class="modal-content">
       <h2 data-i18n="presets_title">Pré-définir pièces</h2>
-      <div class="tabs">
+      <div class="tabs" id="presetTabs">
         <button class="tab-btn active" data-tab="Fin de chantier" onclick="switchTab('Fin de chantier')">Fin de chantier</button>
         <button class="tab-btn" data-tab="Fin de bail -" onclick="switchTab('Fin de bail -')">Fin de bail -</button>
         <button class="tab-btn" data-tab="Fin de bail +" onclick="switchTab('Fin de bail +')">Fin de bail +</button>
@@ -209,14 +214,6 @@
           <button class="btn" type="button" onclick="addResidencePiecePreset()">Ajouter</button>
         </div>
       </div>
-      <div class="separator"></div>
-      <div class="custom-type">
-        <h3>➕ <span data-i18n="add_type">Créer un type personnalisé</span></h3>
-        <div class="row">
-          <input type="text" id="newTypeName" placeholder="Ex: Nettoyage vitres">
-          <button class="btn" onclick="createCustomType()">Créer</button>
-        </div>
-      </div>
       <div class="modal-actions">
         <button onclick="savePresets()" class="btn white">Enregistrer</button>
         <button onclick="closePresets()" class="btn white">Fermer</button>
@@ -225,22 +222,162 @@
     </div>
   </div>
 
-  <div id="infoModal" class="modal hidden">
-    <div class="modal-content">
-      <h2>ℹ️ Comment ça marche ?</h2>
-      <div class="info-text">
-        <p><strong>1)</strong> Choisis le type d’intervention (Fin de chantier / Fin de bail - / Fin de bail + / etc.).</p>
-        <p><strong>2)</strong> Ajoute des pièces avec <strong>+ Ajuster</strong> (ou via les pré-définitions 🔷).</p>
-        <p><strong>3)</strong> Pour <strong>Méthodes</strong> et <strong>Entretien régulier</strong> : sélectionne un nom + sa capacité (M²) puis saisis la <strong>surface</strong>.
-           Le temps est calculé automatiquement : <em>H = Surface / M²</em> (ex: 600 / 300 = 2h). Tu peux aussi saisir H manuellement.</p>
-        <p><strong>4)</strong> Génère le PDF avec le bouton <strong>PDF</strong>.</p>
-        <p><strong>Dans le PDF</strong> : client, date, type, liste des pièces et total (heures), remarques.</p>
+  
+<div id="typesModal" class="modal hidden">
+  <div class="modal-content modal-scroll">
+    <div class="modal-head">
+      <h2>⚙️ Gestion des types</h2>
+      <button class="btn white small" type="button" onclick="closeTypeManager()">Fermer</button>
+    </div>
+
+    <div class="type-manager">
+      <div class="type-create">
+        <h3>➕ Créer un type</h3>
+        <div class="row">
+          <input type="text" id="tm_name" placeholder="Ex: Restaurant">
+          <select id="tm_template">
+            <option value="vitres">Modèle 2 blocs (comme Vitres)</option>
+            <option value="m2h">Méthodes / Entretien (Surface / M²)</option>
+            <option value="pieces_biblio">Pièces (bibliothèque)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="tm_opt_pieces" checked> Pièces (bloc gauche)</label>
+          <label class="check"><input type="checkbox" id="tm_opt_m2" checked> M²/h (bloc droite)</label>
+          <label class="check"><input type="checkbox" id="tm_opt_coef" checked> Coef %</label>
+        </div>
+        <div class="row">
+          <input type="number" id="tm_coef" step="1" min="0" placeholder="Coef % (ex: 20)">
+          <input type="number" id="tm_d1" step="1" min="0" placeholder="Difficulté 1 % (ex: 20)">
+          <input type="number" id="tm_d2" step="1" min="0" placeholder="Difficulté 2 % (ex: 30)">
+        </div>
+        <button class="btn" type="button" onclick="tmCreate()">Créer</button>
       </div>
-      <div class="modal-actions">
-        <button onclick="closeInfo()" class="btn white">Fermer</button>
+
+      <div class="separator"></div>
+
+      <div>
+        <h3>Types existants</h3>
+        <div id="tm_list" class="tm-list"></div>
+        <small>💡 Désactiver = disparaît du menu, mais reste enregistré.</small>
       </div>
     </div>
   </div>
+</div>
+
+<div id="infoModal" class="modal hidden">
+  <div class="modal-content info-modal">
+    <h2>ℹ️ Guide – Comment remplir (Pièces + m²/h)</h2>
+
+    <div class="info-accordion">
+      <details open>
+        <summary>✅ Fonctionnement (2 blocs)</summary>
+        <div class="info-block">
+          <p><strong>Bloc 1 — Pièces (Unité/h)</strong> : tâches par division/unité (WC, cuisine, chambres, extras).</p>
+          <p><strong>Bloc 2 — Surface (m²/h)</strong> : zones grandes / entretien général (sol, aspiration, passage).</p>
+          <p><strong>Formules</strong> : Pièces = h/unité × quantité • Surface = m² ÷ (m²/h) • Total = Pièces + Surface.</p>
+          <p><strong>Affichage</strong> : le total apparaît en décimal + format horaire automatique : <strong>2.25 (2:15h)</strong>.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>🧮 Exemples (Entretien résidence)</summary>
+        <div class="info-block">
+          <h4>Exemple A — T3 80m²</h4>
+          <table class="info-table">
+            <thead><tr><th>Pièce</th><th>h/unité</th><th>Qté</th><th>Total</th></tr></thead>
+            <tbody>
+              <tr><td>WC</td><td>0.75</td><td>2</td><td>1.50</td></tr>
+              <tr><td>Cuisine</td><td>1.50</td><td>1</td><td>1.50</td></tr>
+              <tr><td>Chambre</td><td>0.50</td><td>3</td><td>1.50</td></tr>
+              <tr><td>Salon</td><td>0.75</td><td>1</td><td>0.75</td></tr>
+              <tr><td colspan="3"><strong>Subtotal Pièces</strong></td><td><strong>5.25</strong></td></tr>
+            </tbody>
+          </table>
+          <table class="info-table">
+            <thead><tr><th>Surface</th><th>m²</th><th>Capacité (m²/h)</th><th>Total</th></tr></thead>
+            <tbody>
+              <tr><td>Appartement</td><td>80</td><td>40</td><td>2.00</td></tr>
+              <tr><td colspan="3"><strong>Subtotal Surface</strong></td><td><strong>2.00</strong></td></tr>
+            </tbody>
+          </table>
+          <p><strong>Total</strong> = 5.25 + 2.00 = <strong>7.25 (7:15h)</strong></p>
+
+          <h4>Exemple B — 40m²</h4>
+          <p>Pièces: 1 WC (0.75×1=0.75) + 1 cuisine (1.00×1=1.00) → <strong>1.75</strong><br>
+             Surface: 40 ÷ 60 = <strong>0.67</strong><br>
+             Total: <strong>2.42 (2:25h)</strong></p>
+        </div>
+      </details>
+
+      <details>
+        <summary>📐 Capacités recommandées (m²/h)</summary>
+        <div class="info-block">
+          <table class="info-table">
+            <thead><tr><th>Type</th><th>m²/h recommandé</th></tr></thead>
+            <tbody>
+              <tr><td>Entretien normal</td><td>45 – 70</td></tr>
+              <tr><td>Entretien lourd</td><td>30 – 50</td></tr>
+              <tr><td>Fin de bail (rapide par surface)</td><td>15 – 35</td></tr>
+              <tr><td>Fin de chantier</td><td>8 – 28</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+
+      <details>
+        <summary>🧾 Référence N°1 — Heures par pièce</summary>
+        <div class="info-block">
+          <table class="info-table">
+            <thead><tr><th>Pièce</th><th>Fin de bail (moy.)</th><th>Très sale</th><th>Fin de chantier</th></tr></thead>
+            <tbody>
+              <tr><td>Cuisine</td><td>4–6h</td><td>7–9h</td><td>5–7h</td></tr>
+              <tr><td>Salle de bain</td><td>3–4h</td><td>4–6h</td><td>4–5h</td></tr>
+              <tr><td>WC</td><td>1.5–2h</td><td>2–3h</td><td>2–3h</td></tr>
+              <tr><td>Salon / Séjour</td><td>3–4h</td><td>4–5h</td><td>4–6h</td></tr>
+              <tr><td>Chambre (par pièce)</td><td>2–3h</td><td>3–4h</td><td>3–4h</td></tr>
+              <tr><td>Couloir / Entrée</td><td>1–2h</td><td>2–3h</td><td>2–3h</td></tr>
+              <tr><td>Finitions / contrôle</td><td>1–2h</td><td>2–3h</td><td>3–5h</td></tr>
+            </tbody>
+          </table>
+          <p class="muted">Les vitres/stores sont comptés séparément.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>🪟 Référence N°2 — Vitres & Stores</summary>
+        <div class="info-block">
+          <table class="info-table">
+            <thead><tr><th>Type</th><th>Fin de bail</th><th>Très sale</th><th>Fin de chantier</th></tr></thead>
+            <tbody>
+              <tr><td>Fenêtre simple (int./ext.)</td><td>0.5–0.75h</td><td>0.75–1h</td><td>1–1.25h</td></tr>
+              <tr><td>Fenêtre double vitrage</td><td>0.75–1h</td><td>1–1.25h</td><td>1.25–1.5h</td></tr>
+              <tr><td>Baie vitrée simple</td><td>1–1.5h</td><td>1.5–2h</td><td>2–2.5h</td></tr>
+              <tr><td>Baie vitrée large / double</td><td>1.5–2h</td><td>2–2.5h</td><td>2.5–3h</td></tr>
+              <tr><td>Stores à lamelles (suppl.)</td><td>+0.5h</td><td>+0.75–1h</td><td>+1–1.5h</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+
+    <div class="modal-actions">
+      <button onclick="closeInfo()" class="btn white">Fermer</button>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="script.js"></script>

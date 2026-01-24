@@ -111,11 +111,11 @@ function removeResidencePiecePreset(i){
 }
 
 function isM2HTypeForPresets(t){
-  return t==='Méthodes' || (t||'').startsWith('Entretien régulier');
+  return t==='Méthodes' || (t||'').startsWith('Entretien régulier') || serviceTemplateOf(t)==='m2h';
 }
 
 function isVitresStoresTab(t){
-  return t==='Vitres & Stores';
+  return t==='Vitres & Stores' || serviceTemplateOf(t)==='vitres';
 }
 
 function syncPresetAddFields(){
@@ -152,6 +152,7 @@ function syncPresetAddFields(){
 if(!localStorage.getItem('est_first_tip')){localStorage.setItem('est_first_tip','1');$('firstTip')?.classList.remove('hidden');setTimeout(()=>$('firstTip')?.classList.add('hidden'),6000);}
 function openPresets(){
   $('presetsModal').classList.remove('hidden');
+  try{ renderPresetTabs(); }catch(e){}
   renderPresetList();
   syncPresetAddFields();
   renderResidencePieceList();
@@ -165,6 +166,34 @@ function switchTab(t){
   syncPresetAddFields();
   renderResidencePieceList();
   try{ b_currentCatId=null; b_renderAll(); }catch(e){}
+}
+
+function renderPresetTabs(){
+  const cont = document.getElementById('presetTabs') || document.querySelector('#presetsModal .tabs');
+  if(!cont) return;
+  // keep current tab if possible
+  const current = activeTab();
+  // If services manager exists, render from services; otherwise keep existing buttons
+  if(typeof _services === 'undefined' || !_services || !_services.length){
+    return;
+  }
+  cont.innerHTML = '';
+  const activeServices = _services.filter(s=>s && s.active!==false);
+  activeServices.forEach((s, idx)=>{
+    const b=document.createElement('button');
+    b.className='tab-btn' + ((s.name===current) ? ' active' : '');
+    b.setAttribute('data-tab', s.name);
+    b.textContent=s.name;
+    b.onclick=()=>switchTab(s.name);
+    cont.appendChild(b);
+  });
+  // ensure one active
+  const still = activeServices.find(s=>s.name===current);
+  const first = activeServices[0]?.name;
+  const toActivate = (still? current : first) || current;
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.getAttribute('data-tab')===toActivate);
+  });
 }
 function normalizePresetItem(t,p){
   // Sécurise les presets existants si l'utilisateur avait des anciens formats.
@@ -312,10 +341,53 @@ function clearAllPresets(){
   refreshMethodSelect();
   refreshVitresSelects();
 }
-function createCustomType(){const name=$('newTypeName').value.trim();if(!name)return;if(!presets[name])presets[name]=[];const sel=$('cleanType');const opt=document.createElement('option');opt.value=name;opt.textContent=name;sel.insertBefore(opt, sel.querySelector('option[value="__custom__"]'));sel.value=name;$('newTypeName').value='';renderStandardList();alert(lang==='fr'?'Type créé':'Type created');}
+function createCustomType(name){
+  const n = (typeof name==='string' ? name : ($('tm_name')?$('tm_name').value:($('newTypeName')?$('newTypeName').value:'' ))).trim();
+  if(!n) return;
+  const sel=$('cleanType');
+  // add option if not exists
+  if(sel && !Array.from(sel.options).some(o=>o.value===n)){
+    const opt=document.createElement('option');
+    opt.value=n; opt.textContent=n;
+    sel.insertBefore(opt, sel.querySelector('option[value="__custom__"]'));
+  }
+  // init presets according to template
+  const template = (document.getElementById('tm_template')?.value) || 'vitres';
+  if(!presets[n]){
+    if(template==='vitres'){
+      // copy current Vitres & Stores presets (unit + m2)
+      presets[n] = JSON.parse(JSON.stringify(presets['Vitres & Stores'] || []));
+    }else if(template==='m2h'){
+      // copy current Méthodes presets (m²/h lines)
+      presets[n] = JSON.parse(JSON.stringify(presets['Méthodes'] || []));
+    }else if(template==='pieces_biblio'){
+      // Pièces (bibliothèque) : pas de presets (liste = bibliothèque)
+      presets[n] = [];
+      // seed a dedicated biblio for this new type
+      try{
+        if(typeof BIBLIO !== 'undefined'){
+          if(!BIBLIO[n]){
+            BIBLIO[n] = { categories: [
+              { id:'pieces', label:'Pièces', items:[] },
+              { id:'commun', label:'Zones communes', items:[] },
+              { id:'extras', label:'Extras / Ajustements', items:[] },
+            ]};
+            saveBiblio();
+          }
+        }
+      }catch(e){}
+    }else{
+      presets[n] = [];
+    }
+  }
+  savePresets();
+  if(sel){ sel.value=n; }
+}
 let pieces=[];let total=0;
 function toggleAdjuster(){const a=$('adjuster');const b=$('toggleAdjuster');a.classList.toggle('hidden');b.textContent=a.classList.contains('hidden')?'+ Ajuster':'- Ajuster';}
-function isM2HType(t){return t==='Méthodes' || (t||'').startsWith('Entretien régulier');}
+function isM2HType(t){
+  return t==='Méthodes' || (t||'').startsWith('Entretien régulier') || serviceTemplateOf(t)==='m2h';
+}
 
 // ================================
 // ✅ Méthodes / Entretien : plusieurs lignes
@@ -416,7 +488,7 @@ function toggleVitresStores(){
   const wrap=$('vitresWrap');
   const std=$('standardList');
   if(!wrap||!std) return;
-  const on = (t==='Vitres & Stores');
+  const on = isVitresStoresTab(t);
   wrap.classList.toggle('hidden', !on);
   std.classList.toggle('hidden', on);
   if(on){
@@ -424,11 +496,61 @@ function toggleVitresStores(){
     applyVitresPresetToInputs();
   }
 }
+
+// ================================
+// ✅ Coef global (appliqué au total)
+// ================================
+const GLOBAL_COEF_SEL_KEY = 'est_global_coef_sel_v1'; // map {typeName: percent}
+
+function _loadGlobalCoefSel(){
+  try{ return JSON.parse(localStorage.getItem(GLOBAL_COEF_SEL_KEY)||'{}') || {}; }catch(e){ return {}; }
+}
+function _saveGlobalCoefSel(map){
+  localStorage.setItem(GLOBAL_COEF_SEL_KEY, JSON.stringify(map||{}));
+}
+function refreshGlobalCoefUI(){
+  const t = $('cleanType')?.value || '';
+  const sel = $('globalCoefSelect');
+  if(!sel) return;
+  const enabled = serviceHasGlobalCoef(t);
+  sel.classList.toggle('hidden', !enabled);
+  if(!enabled) return;
+
+  const choices = serviceCoefChoices(t); // [0, d1, d2]
+  const labels = choices.map(p=> p===0 ? (lang==='fr'?'Coef 0%':'Coef 0%') : `Coef +${p}%`);
+  const map=_loadGlobalCoefSel();
+  const current = (typeof map[t]==='number') ? map[t] : 0;
+
+  sel.innerHTML='';
+  choices.forEach((p,i)=>{
+    const o=document.createElement('option');
+    o.value=String(p);
+    o.textContent=labels[i];
+    if(p===current) o.selected=true;
+    sel.appendChild(o);
+  });
+  sel.onchange=()=>{
+    const map2=_loadGlobalCoefSel();
+    map2[t]=parseFloat(sel.value)||0;
+    _saveGlobalCoefSel(map2);
+    updateTotal();
+  };
+}
+
+function getCurrentGlobalCoefPercent(){
+  const t = $('cleanType')?.value || '';
+  if(!serviceHasGlobalCoef(t)) return 0;
+  const map=_loadGlobalCoefSel();
+  return (typeof map[t]==='number') ? map[t] : 0;
+}
+
 function onTypeChange(){
   const v=$('cleanType').value;
-  if(v==='__custom__'){openPresets();setTimeout(()=>$('newTypeName').focus(),50);}else{renderStandardList();}
+  if(v==='__custom__'){openTypeManager();setTimeout(()=>$('tm_name')?.focus(),50);}else{renderStandardList();}
   toggleM2H();
   toggleVitresStores();
+  refreshGlobalCoefUI();
+  refreshGlobalCoefUI();
 }
 function currentArr(){
   const t=$('cleanType').value;
@@ -438,7 +560,12 @@ function currentArr(){
 
 // ✅ Bibliothèque apenas para 3 tipos
 function isBiblioType(t){
-  return t==='Fin de chantier' || t==='Fin de bail -' || t==='Fin de bail +';
+  // Base types
+  if(t==='Fin de chantier' || t==='Fin de bail -' || t==='Fin de bail +') return true;
+  // Custom types: Pièces (bibliothèque)
+  const s = getServiceByName(t);
+  if(s && s.template==='pieces_biblio') return true;
+  return false;
 }
 
 let _stdRendered = [];
@@ -564,8 +691,9 @@ function addCustomPiece(){const name=$('customPieceName').value.trim();const tim
 // - Le total ne bouge que quand on clique "Ajouter à la session"
 // ================================
 
-function vitresPresets(){
-  return (presets['Vitres & Stores']||[]).map(p=>normalizePresetItem('Vitres & Stores', p)).filter(p=>p.name);
+function vitresPresets(typeName){
+  const t = typeName || ($('cleanType')?.value || 'Vitres & Stores');
+  return (presets[t]||[]).map(p=>normalizePresetItem(t,p)).filter(p=>p.name);
 }
 
 function refreshVitresSelects(){
@@ -619,7 +747,8 @@ function hoursM2WithDifficulty(m2Normal, m2Diff, cap, coef){
 
 function addVitresToSession(){
   const t=$('cleanType')?.value||'';
-  if(t!=='Vitres & Stores') return;
+  // Allow any custom type that uses the "vitres" (2 blocs) template.
+  if(!isVitresStoresTab(t)) return;
 
   const uPreset = $('vit_u_preset')?.value || '';
   const mPreset = $('vit_m2_preset')?.value || '';
@@ -641,12 +770,12 @@ function addVitresToSession(){
 
   if(hU>0){
     const baseName = uPreset ? `Unités • ${uPreset}` : 'Unités';
-    const label = `Vitres & Stores - ${baseName} (${qNorm} normal + ${qDiff} diff, +${Math.round(cU*100)}%)`;
+    const label = `${t} - ${baseName} (${qNorm} normal + ${qDiff} diff, +${Math.round(cU*100)}%)`;
     pieces.push({name:label,timePerUnit:hU,qty:1,subtotal:+hU.toFixed(2)});
   }
   if(hM>0){
     const baseName = mPreset ? `M² • ${mPreset}` : 'M²';
-    const label = `Vitres & Stores - ${baseName} (${mNorm} m² normal + ${mDiff} m² diff, +${Math.round(cM*100)}%)`;
+    const label = `${t} - ${baseName} (${mNorm} m² normal + ${mDiff} m² diff, +${Math.round(cM*100)}%)`;
     pieces.push({name:label,timePerUnit:hM,qty:1,subtotal:+hM.toFixed(2)});
   }
 
@@ -655,15 +784,31 @@ function addVitresToSession(){
   updateList();
 }
 function updateList(){const list=$('pieceList');list.innerHTML='';total=0;pieces.forEach((p,i)=>{total+=p.subtotal;const li=document.createElement('li');li.innerHTML=`<div><strong>${p.name}</strong><br><small>${p.timePerUnit}h × ${p.qty} = ${p.subtotal}h</small></div><div class='piece-actions'><button onclick='quickEdit(${i})'>✏️</button><button onclick='removePiece(${i})'>🗑️</button></div>`;list.appendChild(li);});updateTotal();}
+function formatHoursClock(h){
+  const sign = h<0 ? '-' : '';
+  h = Math.abs(h||0);
+  const totalMin = Math.round(h*60);
+  const hh = Math.floor(totalMin/60);
+  const mm = totalMin%60;
+  return sign + hh + ":" + String(mm).padStart(2,"0") + "h";
+}
+
 function updateTotal(){
   const base=+pieces.reduce((s,p)=>s+p.subtotal,0);
   const ex=extraHours();
   const totalH=(base+ex);
-  $('totalHours').textContent=totalH.toFixed(2);
+
+  const coefP = getCurrentGlobalCoefPercent ? (getCurrentGlobalCoefPercent()||0) : 0;
+  const totalFinal = totalH * (1 + (coefP/100));
+  const totalClock = formatHoursClock(totalFinal);
+
+  $('totalHours').textContent = totalFinal.toFixed(2) + ' (' + formatHoursClock(totalFinal) + ')';
+
   // Équipe = Total / heures par personne (sans arrondir)
   const hpp=parseFloat($('hoursPerPerson')?.value||'0')||0;
-  const people = (hpp>0) ? (totalH / hpp) : 0;
-  if($('teamTotal')) $('teamTotal').textContent=totalH.toFixed(2);
+  const people = (hpp>0) ? (totalFinal / hpp) : 0;
+
+  if($('teamTotal')) $('teamTotal').textContent = totalFinal.toFixed(2) + ' (' + formatHoursClock(totalFinal) + ')';
   if($('teamPeople')) $('teamPeople').textContent=people.toFixed(2);
 }
 function quickEdit(i){const p=pieces[i];const q=parseInt(prompt('Quantité',p.qty));const t=parseFloat(prompt('Temps unitaire (h)',p.timePerUnit));if(isNaN(q)||isNaN(t))return;p.qty=q;p.timePerUnit=t;p.subtotal=+(q*t).toFixed(2);updateList();}
@@ -749,6 +894,7 @@ window.addEventListener('load',()=>{
   renderStandardList();
   toggleM2H();
   toggleVitresStores();
+  refreshGlobalCoefUI();
   $('hoursPerPerson')?.addEventListener('input', updateTotal);
   $('presetKind')?.addEventListener('change', syncPresetAddFields);
   $('vit_u_preset')?.addEventListener('change', applyVitresPresetToInputs);
@@ -1054,4 +1200,231 @@ function biblioAddItem(){
   cat.items.push({ id: b_uid('it'), label: label.trim(), time });
   saveBiblio();
   b_renderAll();
+}
+
+
+
+// =====================================================
+// ✅ Gestion des types (sans casser l’existant)
+// =====================================================
+const SERVICES_KEY = 'est_services_v1';
+
+function _loadServicesLegacy(){
+  const sel = document.getElementById('cleanType');
+  const base = sel ? Array.from(sel.options).map(o=>o.value).filter(v=>v && v!=='__custom__') : [];
+  const raw = localStorage.getItem(SERVICES_KEY);
+  if(raw){
+    try{
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)){
+        base.forEach(n=>{ if(!arr.find(x=>x.name===n)) arr.push({id:'svc_'+Math.random().toString(16).slice(2,10),name:n,active:true,locked:true}); });
+        return arr;
+      }
+    }catch(e){}
+  }
+  const seeded = base.map(n=>({id:'svc_'+Math.random().toString(16).slice(2,10),name:n,active:true,locked:true}));
+  localStorage.setItem(SERVICES_KEY, JSON.stringify(seeded));
+  return seeded;
+}
+
+function getServiceByName(name){
+  return (_services||[]).find(s=>s && s.name===name) || null;
+}
+function serviceTemplateOf(name){
+  if(name==='Vitres & Stores') return 'vitres';
+  if(name==='Méthodes' || (name||'').startsWith('Entretien régulier')) return 'm2h';
+  const s=getServiceByName(name);
+  return s?.template || 'standard';
+}
+function serviceHasGlobalCoef(name){
+  const s=getServiceByName(name);
+  // Base rule: aucun coef global par défaut (même pour Fin de chantier).
+  // Le coef global n'apparaît que si l'option est activée dans la gestion de types.
+  if(!s) return false;
+  return !!(s.options && s.options.coef);
+}
+function serviceCoefChoices(name){
+  const s=getServiceByName(name);
+  const d1 = s?.diff1 ?? 20;
+  const d2 = s?.diff2 ?? 30;
+  return [0, d1, d2];
+}
+
+let _services = _loadServicesLegacy();
+function _saveServices(){ localStorage.setItem(SERVICES_KEY, JSON.stringify(_services)); }
+
+// Ensure the main type <select> contains all (active) services from localStorage,
+// including custom types after a page refresh.
+function syncTypeSelectFromServices(){
+  const sel = document.getElementById('cleanType');
+  if(!sel) return;
+  _services.forEach(s=>{
+    if(!s || !s.name) return;
+    let opt = Array.from(sel.options).find(o=>o.value===s.name);
+    if(!opt){
+      opt = document.createElement('option');
+      opt.value = s.name;
+      opt.textContent = s.name;
+      const custom = sel.querySelector('option[value="__custom__"]');
+      if(custom) sel.insertBefore(opt, custom);
+      else sel.appendChild(opt);
+    }
+    opt.hidden = (s.active===false);
+  });
+}
+
+// Run once on load
+syncTypeSelectFromServices();
+
+function openTypeManager(){
+  document.getElementById('typesModal')?.classList.remove('hidden');
+  tmRenderList();
+  try{ tmSyncTemplateUI(); }catch(e){}
+}
+function closeTypeManager(){
+  document.getElementById('typesModal')?.classList.add('hidden');
+}
+
+// Ajuste automatiquement les options selon le modèle choisi
+function tmSyncTemplateUI(){
+  const tpl = document.getElementById('tm_template');
+  const optPieces = document.getElementById('tm_opt_pieces');
+  const optM2 = document.getElementById('tm_opt_m2');
+  const optCoef = document.getElementById('tm_opt_coef');
+  const coef = document.getElementById('tm_coef');
+  if(!tpl) return;
+  const v = tpl.value;
+  if(v==='vitres'){
+    if(optPieces) optPieces.checked = true;
+    if(optM2) optM2.checked = true;
+  }else if(v==='m2h'){
+    if(optPieces) optPieces.checked = false;
+    if(optM2) optM2.checked = true;
+  }else if(v==='pieces_biblio'){
+    if(optPieces) optPieces.checked = true;
+    if(optM2) optM2.checked = false;
+    if(optCoef) optCoef.checked = false;
+    if(coef) coef.value = '';
+  }
+}
+
+// Bind change
+try{
+  const tpl=document.getElementById('tm_template');
+  if(tpl){ tpl.addEventListener('change', tmSyncTemplateUI); }
+}catch(e){}
+
+function tmCreate(){
+  const name = (document.getElementById('tm_name')?.value||'').trim();
+  if(!name) return alert('Nom requis');
+  if(_services.find(s=>s.name===name)) return alert('Existe déjà');
+  // create using existing presets workflow
+  if(typeof createCustomType === 'function') createCustomType(name);
+
+  const template = document.getElementById('tm_template')?.value || 'vitres';
+  let optPieces = !!document.getElementById('tm_opt_pieces')?.checked;
+  let optM2 = !!document.getElementById('tm_opt_m2')?.checked;
+  let optCoef = !!document.getElementById('tm_opt_coef')?.checked;
+  // Force rules per template
+  if(template==='pieces_biblio'){ optPieces = true; optM2 = false; }
+  const coef = parseFloat(document.getElementById('tm_coef')?.value||'0')||0;
+  const d1 = parseFloat(document.getElementById('tm_d1')?.value||'20')||20;
+  const d2 = parseFloat(document.getElementById('tm_d2')?.value||'30')||30;
+
+  _services.push({id:'svc_'+Math.random().toString(16).slice(2,10), name, active:true, locked:false, template, options:{pieces:optPieces,m2:optM2,coef:optCoef}, coefPercent:coef, diff1:d1, diff2:d2});
+  _saveServices();
+  document.getElementById('tm_name').value='';
+  tmRenderList();
+  const sel = document.getElementById('cleanType');
+  if(sel && Array.from(sel.options).some(o=>o.value===name)){ sel.value=name; onTypeChange(); }
+  alert('Type créé');
+}
+
+function tmRenderList(){
+  const wrap = document.getElementById('tm_list');
+  const sel = document.getElementById('cleanType');
+  if(!wrap || !sel) return;
+  wrap.innerHTML='';
+  // ensure services cover select options
+  const existing = Array.from(sel.options).map(o=>o.value).filter(v=>v && v!=='__custom__');
+  existing.forEach(n=>{ if(!_services.find(s=>s.name===n)) _services.push({id:'svc_'+Math.random().toString(16).slice(2,10),name:n,active:true,locked:true}); });
+  _saveServices();
+
+  _services.forEach(s=>{
+    const row=document.createElement('div');
+    row.className='tm-item';
+    const left=document.createElement('div');
+    left.className='tm-left';
+    left.innerHTML = `<strong>${s.name}</strong><small>${s.locked?'Type de base':'Personnalisé'}</small>`;
+    const actions=document.createElement('div');
+    actions.className='tm-actions';
+
+    const btnRename=document.createElement('button');
+    btnRename.className='btn white small';
+    btnRename.textContent='Renommer';
+    btnRename.onclick=()=>{
+      const nn=prompt('Nouveau nom', s.name);
+      if(!nn) return;
+      if(_services.find(x=>x.name===nn)) return alert('Ce nom existe déjà');
+      // rename in select
+      Array.from(sel.options).forEach(o=>{ if(o.value===s.name){ o.value=nn; o.textContent=nn; }});
+      // rename presets object
+      if(typeof presets !== 'undefined' && presets[s.name]){
+        presets[nn]=presets[s.name];
+        delete presets[s.name];
+        localStorage.setItem('est_presets_v4', JSON.stringify(presets));
+      }
+      // rename tab buttons
+      document.querySelectorAll('.tab-btn').forEach(b=>{
+        if(b.getAttribute('data-tab')===s.name){ b.setAttribute('data-tab', nn); b.textContent = nn; b.onclick=()=>switchTab(nn); }
+      });
+      s.name=nn;
+      _saveServices();
+      tmRenderList();
+    };
+
+    const btnToggle=document.createElement('button');
+    btnToggle.className='btn white small';
+    btnToggle.textContent = (s.active===false)?'Activer':'Désactiver';
+    btnToggle.onclick=()=>{
+      s.active = (s.active===false)?true:false;
+      // hide/show in select
+      Array.from(sel.options).forEach(o=>{ if(o.value===s.name){ o.hidden = (s.active===false); }});
+      _saveServices();
+      tmRenderList();
+    };
+
+    const btnDel=document.createElement('button');
+    btnDel.className='btn white small danger';
+    btnDel.textContent='Supprimer';
+    btnDel.onclick=()=>{
+      if(s.locked) return alert('Impossible: type de base');
+      if(!confirm('Supprimer définitivement ?')) return;
+      Array.from(sel.options).forEach(o=>{ if(o.value===s.name) o.remove(); });
+      if(typeof presets !== 'undefined' && presets[s.name]){
+        delete presets[s.name];
+        localStorage.setItem('est_presets_v4', JSON.stringify(presets));
+      }
+      document.querySelectorAll('.tab-btn').forEach(b=>{ if(b.getAttribute('data-tab')===s.name) b.remove(); });
+      _services = _services.filter(x=>x.id!==s.id);
+      _saveServices();
+      tmRenderList();
+    };
+
+    actions.appendChild(btnRename);
+    actions.appendChild(btnToggle);
+    actions.appendChild(btnDel);
+
+    row.appendChild(left);
+    row.appendChild(actions);
+    wrap.appendChild(row);
+  });
+}
+function hoursToClock(h){
+  const sign = h < 0 ? '-' : '';
+  const v = Math.abs(Number(h) || 0);
+  const totalMin = Math.round(v * 60);
+  const hh = Math.floor(totalMin / 60);
+  const mm = totalMin % 60;
+  return sign + hh + ':' + String(mm).padStart(2, '0');
 }
