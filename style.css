@@ -102,6 +102,41 @@ textarea{min-height:80px}
 @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @media (max-width:720px){.row{flex-direction:column}.custom-piece{flex-direction:column;align-items:stretch}.standard-list{overflow:auto}}
 
+/* =============================
+   ✅ Mobile small screens (phones)
+   ============================= */
+@media (max-width:520px){
+  header{padding:10px 12px;gap:8px;flex-wrap:wrap}
+  .brand span{font-weight:800;font-size:14px}
+  .icon-btn{padding:6px 8px;border-radius:10px}
+  #langSelect{padding:6px 8px;border-radius:10px}
+  main{padding:10px}
+  .card{padding:12px;border-radius:14px}
+  .actions{gap:10px;flex-wrap:wrap}
+  .btn.white{width:100%}
+
+  /* modals */
+  .modal{padding:12px}
+  .modal-content{width:96vw;max-width:96vw;padding:12px;border-radius:14px}
+  .modal-scroll{max-height:92vh}
+
+  /* Bibliothèque modal layout */
+  .biblio-grid{flex-direction:column}
+  .biblio-left{width:100%;min-width:0;padding:8px}
+  .biblio-right{width:100%;padding:8px}
+  .biblio-cats{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px}
+  .biblio-cats .b-cat{margin:0;flex:0 0 auto}
+  .biblio-cats button{white-space:nowrap}
+  .biblio-items .b-item{gap:10px}
+  .biblio-items .b-item .left{min-width:0}
+  .biblio-items .b-item .left strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52vw}
+}
+
+@media (max-width:380px){
+  .brand span{display:none}
+  .logo-drop{width:16px;height:22px}
+}
+
 /* Added: scrollable modal + type manager */
 .modal-scroll{max-height:92vh;overflow:auto}
 .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;position:sticky;top:0;background:rgba(255,255,255,.96);backdrop-filter:blur(6px);padding-bottom:10px;margin-bottom:10px;z-index:2}

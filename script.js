@@ -1,7 +1,649 @@
 function $(id){return document.getElementById(id)}
-const i18n={fr:{client:'Nom client',date:'Date',type:'Type de nettoyage',pieces:'Pièces (pré-definitions)',add_custom:'Ajouter pièce personnalisée',list:'Liste des pièces',total:'Total estimé :',remarks:'Remarques :',presets_title:'Pré-définir pièces',first_tip:'💬 Conseil : utilisez le bouton 🔷 pour définir vos pièces personnalisées (une seule fois).',add_type:'Créer un type personnalisé'},en:{client:'Client name',date:'Date',type:'Cleaning type',pieces:'Rooms (presets)',add_custom:'Add custom room',list:'Rooms list',total:'Estimated total:',remarks:'Remarks:',presets_title:'Predefine rooms',first_tip:'💬 Tip: use the 🔷 button to set your custom rooms (one time).',add_type:'Create a custom type'}};
-let lang=localStorage.getItem('est_lang')||'fr';function setLang(l){lang=l;localStorage.setItem('est_lang',l);translateAll();}
-function translateAll(){document.querySelectorAll('[data-i18n]').forEach(el=>{const k=el.getAttribute('data-i18n');if(i18n[lang]&&i18n[lang][k])el.textContent=i18n[lang][k];});$('langSelect').value=lang;$('clientName').placeholder=(lang==='fr'?'Nom du client':'Client name');$('remarks').placeholder=(lang==='fr'?'Remarques...':'Remarks...');}translateAll();
+
+const i18n = {
+  fr: {
+    piece_kitchen: "Cuisine",
+    piece_bathroom: "Salle de bain",
+    piece_wc: "WC",
+    piece_living: "Salon / Séjour",
+    piece_bedroom: "Chambre",
+    piece_windows: "Fenêtres",
+    client: "Nom client",
+    date: "Date",
+    type: "Type de nettoyage",
+    pieces: "Pièces (pré-définitions)",
+    add_custom: "Ajouter pièce personnalisée",
+    list: "Liste des pièces",
+    total: "Total estimé :",
+    remarks: "Remarques :",
+    presets_title: "Pré-définir pièces",
+    first_tip: "💬 Conseil : utilisez le bouton 🔷 pour définir vos pièces personnalisées (une seule fois).",
+    add_type: "Créer un type personnalisé",
+    close: "Fermer",
+    info_h: "ℹ️ Guide – Comment remplir (Pièces + m²/h)",
+    t_predefine: "Pré-définir pièces",
+    t_info: "Comment ça marche ?",
+    t_types: "Gestion des types",
+    t_install: "Installer l’app",
+    sub_types: "⚙️ Gestion des types",
+    btn_add: "➕ Ajouter",
+    btn_adjust: "+ Ajuster",
+    btn_add_session: "Ajouter à la session",
+    btn_pdf: "PDF",
+    btn_reset: "Réinitialiser",
+    team: "Équipe :",
+    ph_client: "Nom du client",
+    ph_remarks: "Remarques...",
+    ph_custom_name: "Nom (ex: Jardin d'hiver)",
+    ph_custom_time: "Temps par unité (h)",
+    ph_custom_qty: "Quantité",
+    info_html: `
+      <div class="info-accordion">
+        <details open>
+          <summary>✅ Fonctionnement (2 blocs)</summary>
+          <div class="info-block">
+            <p><strong>Bloc 1 — Pièces (Unité/h)</strong> : tâches par division/unité (WC, cuisine, chambres, extras).</p>
+            <p><strong>Bloc 2 — Surface (m²/h)</strong> : zones grandes / entretien général (sol, aspiration, passage).</p>
+            <p><strong>Formules</strong> : Pièces = h/unité × quantité • Surface = m² ÷ (m²/h) • Total = Pièces + Surface.</p>
+            <p><strong>Affichage</strong> : total en décimal + format horaire automatique : <strong>2.25 (2:15h)</strong>.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>🧮 Exemples (Entretien résidence)</summary>
+          <div class="info-block">
+            <h4>Exemple A — T3 80m²</h4>
+            <table class="info-table">
+              <thead><tr><th>Pièce</th><th>h/unité</th><th>Qté</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>WC</td><td>0.75</td><td>2</td><td>1.50</td></tr>
+                <tr><td>Cuisine</td><td>1.50</td><td>1</td><td>1.50</td></tr>
+                <tr><td>Chambre</td><td>0.50</td><td>3</td><td>1.50</td></tr>
+                <tr><td>Salon</td><td>0.75</td><td>1</td><td>0.75</td></tr>
+                <tr><td colspan="3"><strong>Subtotal Pièces</strong></td><td><strong>5.25</strong></td></tr>
+              </tbody>
+            </table>
+            <table class="info-table">
+              <thead><tr><th>Surface</th><th>m²</th><th>Capacité (m²/h)</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>Appartement</td><td>80</td><td>40</td><td>2.00</td></tr>
+                <tr><td colspan="3"><strong>Subtotal Surface</strong></td><td><strong>2.00</strong></td></tr>
+              </tbody>
+            </table>
+            <p><strong>Total</strong> = 5.25 + 2.00 = <strong>7.25 (7:15h)</strong></p>
+
+            <h4>Exemple B — 40m²</h4>
+            <p>Pièces: 1 WC (0.75×1=0.75) + 1 cuisine (1.00×1=1.00) → <strong>1.75</strong><br>
+               Surface: 40 ÷ 60 = <strong>0.67</strong><br>
+               Total: <strong>2.42 (2:25h)</strong></p>
+          </div>
+        </details>
+
+        <details>
+          <summary>📐 Capacités recommandées (m²/h)</summary>
+          <div class="info-block">
+            <table class="info-table">
+              <thead><tr><th>Type</th><th>m²/h recommandé</th></tr></thead>
+              <tbody>
+                <tr><td>Entretien normal</td><td>45 – 70</td></tr>
+                <tr><td>Entretien lourd</td><td>30 – 50</td></tr>
+                <tr><td>Fin de bail (rapide par surface)</td><td>15 – 35</td></tr>
+                <tr><td>Fin de chantier</td><td>8 – 28</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    `
+  ,
+    btn_save: "Enregistrer",
+    btn_clear_all: "Effacer tout",
+    tm_title: "⚙️ Gestion des types",
+    tm_create_h: "➕ Créer un type",
+    tm_name_ph: "Ex: Restaurant",
+    tm_tpl_vitres: "Modèle 2 blocs (comme Vitres)",
+    tm_tpl_m2h: "Méthodes / Entretien (Surface / M²)",
+    tm_tpl_biblio: "Pièces (bibliothèque)",
+    tm_opt_pieces: "Pièces (bloc gauche)",
+    tm_opt_m2: "M²/h (bloc droite)",
+    tm_opt_coef: "Coef %",
+    tm_coef_ph: "Coef % (ex: 20)",
+    tm_d1_ph: "Difficulté 1 % (ex: 20)",
+    tm_d2_ph: "Difficulté 2 % (ex: 30)",
+    tm_btn_create: "Créer",
+    tm_existing_h: "Types existants",
+    tm_hint: "💡 Désactiver = disparaît du menu, mais reste enregistré.",
+    tm_btn_rename: "Renommer",
+    tm_btn_enable: "Activer",
+    tm_btn_disable: "Désactiver",
+    tm_btn_delete: "Supprimer",
+    tm_bad_name: "Nom requis",
+    tm_exists: "Existe déjà",
+    tm_created: "Type créé",
+    tm_cant_delete_base: "Impossible: type de base",
+    tm_confirm_delete: "Supprimer définitivement ?",
+    tm_prompt_new_name: "Nouveau nom",
+    tm_name_exists: "Ce nom existe déjà",
+    tm_lbl_base: "Type de base",
+    tm_lbl_custom: "Personnalisé",
+    confirm_delete: "Supprimer ?",
+    prompt_new_category: "Nom nouvelle catégorie:",
+    prompt_item_name: "Nom item:",
+    prompt_time_h: "Temps (h):",
+    alert_choose_category: "Choisis une catégorie.",
+    alert_presets_saved: "Pré-définitions enregistrées",
+    title_delete: "Supprimer",
+    btn_add_plain: "Ajouter",
+    res_piece_name_ph: "Nom pièce (ex: Cuisine)",
+    res_piece_time_ph: "Temps (h)",
+    err_name_time: "Nom et temps requis",
+    err_name_m2: "Nom et M² requis",
+    err_name_cap: "Nom et capacité requis",
+    err_valid_name_time: "Nom et temps valides requis",
+    err_nothing_add: "Rien à ajouter",
+    err_pdf_lib: "Bibliothèque PDF indisponible",
+    confirm_clear_all: "Tout effacer?",
+    confirm_reset_session: "Réinitialiser la session actuelle?",
+    confirm_delete_cat: "Supprimer catégorie ?",
+    confirm_delete_item: "Supprimer item ?",
+    prompt_name: "Nom",
+    prompt_time_h_short: "Temps (h)",
+    prompt_qty: "Quantité",
+    prompt_unit_time: "Temps unitaire (h)",
+    prompt_pdf_name: "Nom du fichier PDF:",
+    prompt_cat_name: "Nom catégorie:",
+    prompt_item_name2: "Nom item:",
+    prompt_m2: "M²",
+    prompt_capacity: "Capacité (m²/h)",
+    prompt_time_per_unit: "Temps par unité (h)"},
+
+  en: {
+    piece_kitchen: "Kitchen",
+    piece_bathroom: "Bathroom",
+    piece_wc: "WC",
+    piece_living: "Living room",
+    piece_bedroom: "Bedroom",
+    piece_windows: "Windows",
+    client: "Client",
+    date: "Date",
+    type: "Cleaning type",
+    pieces: "Rooms (presets)",
+    add_custom: "Add custom room",
+    list: "Rooms list",
+    total: "Estimated total:",
+    remarks: "Remarks:",
+    presets_title: "Predefine rooms",
+    first_tip: "💬 Tip: use the 🔷 button to set your custom rooms (one time).",
+    add_type: "Create a custom type",
+    close: "Close",
+    info_h: "ℹ️ Guide – How to fill in (Rooms + m²/h)",
+    t_predefine: "Predefine rooms",
+    t_info: "How does it work?",
+    t_types: "Type settings",
+    t_install: "Install app",
+    sub_types: "⚙️ Type settings",
+    btn_add: "➕ Add",
+    btn_adjust: "+ Adjust",
+    btn_add_session: "Add to session",
+    btn_pdf: "PDF",
+    btn_reset: "Reset",
+    team: "Team:",
+    ph_client: "Client name",
+    ph_remarks: "Remarks...",
+    ph_custom_name: "Name (e.g., Winter garden)",
+    ph_custom_time: "Time per unit (h)",
+    ph_custom_qty: "Quantity",
+    info_html: `
+      <div class="info-accordion">
+        <details open>
+          <summary>✅ How it works (2 blocks)</summary>
+          <div class="info-block">
+            <p><strong>Block 1 — Rooms (Unit/h)</strong>: tasks per room/unit (WC, kitchen, bedrooms, extras).</p>
+            <p><strong>Block 2 — Surface (m²/h)</strong>: large areas / general maintenance (floors, vacuuming, passes).</p>
+            <p><strong>Formulas</strong>: Rooms = h/unit × qty • Surface = m² ÷ (m²/h) • Total = Rooms + Surface.</p>
+            <p><strong>Display</strong>: decimal total + automatic time format: <strong>2.25 (2:15h)</strong>.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>🧮 Examples (Residential maintenance)</summary>
+          <div class="info-block">
+            <h4>Example A — 80m² apartment</h4>
+            <table class="info-table">
+              <thead><tr><th>Room</th><th>h/unit</th><th>Qty</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>WC</td><td>0.75</td><td>2</td><td>1.50</td></tr>
+                <tr><td>Kitchen</td><td>1.50</td><td>1</td><td>1.50</td></tr>
+                <tr><td>Bedroom</td><td>0.50</td><td>3</td><td>1.50</td></tr>
+                <tr><td>Living room</td><td>0.75</td><td>1</td><td>0.75</td></tr>
+                <tr><td colspan="3"><strong>Rooms subtotal</strong></td><td><strong>5.25</strong></td></tr>
+              </tbody>
+            </table>
+            <table class="info-table">
+              <thead><tr><th>Surface</th><th>m²</th><th>Capacity (m²/h)</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>Apartment</td><td>80</td><td>40</td><td>2.00</td></tr>
+                <tr><td colspan="3"><strong>Surface subtotal</strong></td><td><strong>2.00</strong></td></tr>
+              </tbody>
+            </table>
+            <p><strong>Total</strong> = 5.25 + 2.00 = <strong>7.25 (7:15h)</strong></p>
+
+            <h4>Example B — 40m²</h4>
+            <p>Rooms: 1 WC (0.75×1=0.75) + 1 kitchen (1.00×1=1.00) → <strong>1.75</strong><br>
+               Surface: 40 ÷ 60 = <strong>0.67</strong><br>
+               Total: <strong>2.42 (2:25h)</strong></p>
+          </div>
+        </details>
+
+        <details>
+          <summary>📐 Recommended capacities (m²/h)</summary>
+          <div class="info-block">
+            <table class="info-table">
+              <thead><tr><th>Type</th><th>Recommended m²/h</th></tr></thead>
+              <tbody>
+                <tr><td>Normal maintenance</td><td>45 – 70</td></tr>
+                <tr><td>Heavy maintenance</td><td>30 – 50</td></tr>
+                <tr><td>End of lease (quick by surface)</td><td>15 – 35</td></tr>
+                <tr><td>Construction cleanup</td><td>8 – 28</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    `
+  ,
+    btn_save: "Save",
+    btn_clear_all: "Clear all",
+    tm_title: "⚙️ Type settings",
+    tm_create_h: "➕ Create a type",
+    tm_name_ph: "E.g., Restaurant",
+    tm_tpl_vitres: "2-block template (like Windows)",
+    tm_tpl_m2h: "Methods / Regular cleaning (Surface / m²)",
+    tm_tpl_biblio: "Rooms (library)",
+    tm_opt_pieces: "Rooms (left block)",
+    tm_opt_m2: "m²/h (right block)",
+    tm_opt_coef: "Coef %",
+    tm_coef_ph: "Coef % (e.g., 20)",
+    tm_d1_ph: "Difficulty 1 % (e.g., 20)",
+    tm_d2_ph: "Difficulty 2 % (e.g., 30)",
+    tm_btn_create: "Create",
+    tm_existing_h: "Existing types",
+    tm_hint: "💡 Disable = hidden from the menu, but kept saved.",
+    tm_btn_rename: "Rename",
+    tm_btn_enable: "Enable",
+    tm_btn_disable: "Disable",
+    tm_btn_delete: "Delete",
+    tm_bad_name: "Name required",
+    tm_exists: "Already exists",
+    tm_created: "Type created",
+    tm_cant_delete_base: "Not possible: base type",
+    tm_confirm_delete: "Delete permanently?",
+    tm_prompt_new_name: "New name",
+    tm_name_exists: "That name already exists",
+    tm_lbl_base: "Base type",
+    tm_lbl_custom: "Custom",
+    confirm_delete: "Delete?",
+    prompt_new_category: "New category name:",
+    prompt_item_name: "Item name:",
+    prompt_time_h: "Time (h):",
+    alert_choose_category: "Choose a category.",
+    alert_presets_saved: "Presets saved",
+    title_delete: "Delete",
+    btn_add_plain: "Add",
+    res_piece_name_ph: "Room name (e.g., Kitchen)",
+    res_piece_time_ph: "Time (h)",
+    err_name_time: "Name and time required",
+    err_name_m2: "Name and m² required",
+    err_name_cap: "Name and capacity required",
+    err_valid_name_time: "Valid name and time required",
+    err_nothing_add: "Nothing to add",
+    err_pdf_lib: "PDF library not available",
+    confirm_clear_all: "Clear all?",
+    confirm_reset_session: "Reset current session?",
+    confirm_delete_cat: "Delete category?",
+    confirm_delete_item: "Delete item?",
+    prompt_name: "Name",
+    prompt_time_h_short: "Time (h)",
+    prompt_qty: "Quantity",
+    prompt_unit_time: "Unit time (h)",
+    prompt_pdf_name: "PDF file name:",
+    prompt_cat_name: "Category name:",
+    prompt_item_name2: "Item name:",
+    prompt_m2: "m²",
+    prompt_capacity: "Capacity (m²/h)",
+    prompt_time_per_unit: "Time per unit (h)"},
+
+  de: {
+    piece_kitchen: "Küche",
+    piece_bathroom: "Badezimmer",
+    piece_wc: "WC",
+    piece_living: "Wohnzimmer",
+    piece_bedroom: "Schlafzimmer",
+    piece_windows: "Fenster",
+    client: "Kunde",
+    date: "Datum",
+    type: "Reinigungsart",
+    pieces: "Räume (Vorlagen)",
+    add_custom: "Benutzerdefinierten Raum hinzufügen",
+    list: "Räume-Liste",
+    total: "Geschätzte Gesamtzeit:",
+    remarks: "Bemerkungen:",
+    presets_title: "Räume vordefinieren",
+    first_tip: "💬 Tipp: Nutze den 🔷-Button, um deine eigenen Räume einmalig zu definieren.",
+    add_type: "Benutzerdefinierten Typ erstellen",
+    close: "Schließen",
+    info_h: "ℹ️ Anleitung – Ausfüllen (Räume + m²/h)",
+    t_predefine: "Räume vordefinieren",
+    t_info: "Wie funktioniert das?",
+    t_types: "Typen verwalten",
+    t_install: "App installieren",
+    sub_types: "⚙️ Typen verwalten",
+    btn_add: "➕ Hinzufügen",
+    btn_adjust: "+ Anpassen",
+    btn_add_session: "Zur Sitzung hinzufügen",
+    btn_pdf: "PDF",
+    btn_reset: "Zurücksetzen",
+    team: "Team:",
+    ph_client: "Kundenname",
+    ph_remarks: "Bemerkungen...",
+    ph_custom_name: "Name (z.B. Wintergarten)",
+    ph_custom_time: "Zeit pro Einheit (h)",
+    ph_custom_qty: "Menge",
+    info_html: `
+      <div class="info-accordion">
+        <details open>
+          <summary>✅ Funktionsweise (2 Blöcke)</summary>
+          <div class="info-block">
+            <p><strong>Block 1 — Räume (Einheit/h)</strong>: Aufgaben pro Raum/Einheit (WC, Küche, Schlafzimmer, Extras).</p>
+            <p><strong>Block 2 — Fläche (m²/h)</strong>: große Bereiche / allgemeine Unterhaltsreinigung (Böden, Saugen, Durchgänge).</p>
+            <p><strong>Formeln</strong>: Räume = h/Einheit × Menge • Fläche = m² ÷ (m²/h) • Gesamt = Räume + Fläche.</p>
+            <p><strong>Anzeige</strong>: Dezimal + automatische Zeitdarstellung: <strong>2.25 (2:15h)</strong>.</p>
+          </div>
+        </details>
+
+        <details>
+          <summary>🧮 Beispiele (Unterhaltsreinigung Wohnung)</summary>
+          <div class="info-block">
+            <h4>Beispiel A — Wohnung 80m²</h4>
+            <table class="info-table">
+              <thead><tr><th>Raum</th><th>h/Einheit</th><th>Menge</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>WC</td><td>0.75</td><td>2</td><td>1.50</td></tr>
+                <tr><td>Küche</td><td>1.50</td><td>1</td><td>1.50</td></tr>
+                <tr><td>Schlafzimmer</td><td>0.50</td><td>3</td><td>1.50</td></tr>
+                <tr><td>Wohnzimmer</td><td>0.75</td><td>1</td><td>0.75</td></tr>
+                <tr><td colspan="3"><strong>Zwischensumme Räume</strong></td><td><strong>5.25</strong></td></tr>
+              </tbody>
+            </table>
+            <table class="info-table">
+              <thead><tr><th>Fläche</th><th>m²</th><th>Leistung (m²/h)</th><th>Total</th></tr></thead>
+              <tbody>
+                <tr><td>Wohnung</td><td>80</td><td>40</td><td>2.00</td></tr>
+                <tr><td colspan="3"><strong>Zwischensumme Fläche</strong></td><td><strong>2.00</strong></td></tr>
+              </tbody>
+            </table>
+            <p><strong>Gesamt</strong> = 5.25 + 2.00 = <strong>7.25 (7:15h)</strong></p>
+
+            <h4>Beispiel B — 40m²</h4>
+            <p>Räume: 1 WC (0.75×1=0.75) + 1 Küche (1.00×1=1.00) → <strong>1.75</strong><br>
+               Fläche: 40 ÷ 60 = <strong>0.67</strong><br>
+               Gesamt: <strong>2.42 (2:25h)</strong></p>
+          </div>
+        </details>
+
+        <details>
+          <summary>📐 Empfohlene Leistungen (m²/h)</summary>
+          <div class="info-block">
+            <table class="info-table">
+              <thead><tr><th>Typ</th><th>Empfohlen m²/h</th></tr></thead>
+              <tbody>
+                <tr><td>Normaler Unterhalt</td><td>45 – 70</td></tr>
+                <tr><td>Starker Unterhalt</td><td>30 – 50</td></tr>
+                <tr><td>Wohnungsabgabe (schnell nach Fläche)</td><td>15 – 35</td></tr>
+                <tr><td>Bauendreinigung</td><td>8 – 28</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </div>
+    `
+  ,
+    btn_save: "Speichern",
+    btn_clear_all: "Alles löschen",
+    tm_title: "⚙️ Typen verwalten",
+    tm_create_h: "➕ Typ erstellen",
+    tm_name_ph: "z.B. Restaurant",
+    tm_tpl_vitres: "Vorlage 2 Blöcke (wie Fenster)",
+    tm_tpl_m2h: "Methoden / Unterhalt (Fläche / m²)",
+    tm_tpl_biblio: "Räume (Bibliothek)",
+    tm_opt_pieces: "Räume (linker Block)",
+    tm_opt_m2: "m²/h (rechter Block)",
+    tm_opt_coef: "Koeff. %",
+    tm_coef_ph: "Koeff. % (z.B. 20)",
+    tm_d1_ph: "Schwierigkeit 1 % (z.B. 20)",
+    tm_d2_ph: "Schwierigkeit 2 % (z.B. 30)",
+    tm_btn_create: "Erstellen",
+    tm_existing_h: "Vorhandene Typen",
+    tm_hint: "💡 Deaktivieren = im Menü ausgeblendet, bleibt aber gespeichert.",
+    tm_btn_rename: "Umbenennen",
+    tm_btn_enable: "Aktivieren",
+    tm_btn_disable: "Deaktivieren",
+    tm_btn_delete: "Löschen",
+    tm_bad_name: "Name erforderlich",
+    tm_exists: "Bereits vorhanden",
+    tm_created: "Typ erstellt",
+    tm_cant_delete_base: "Nicht möglich: Basistyp",
+    tm_confirm_delete: "Dauerhaft löschen?",
+    tm_prompt_new_name: "Neuer Name",
+    tm_name_exists: "Dieser Name existiert bereits",
+    tm_lbl_base: "Basistyp",
+    tm_lbl_custom: "Benutzerdefiniert",
+    confirm_delete: "Löschen?",
+    prompt_new_category: "Name der neuen Kategorie:",
+    prompt_item_name: "Name des Elements:",
+    prompt_time_h: "Zeit (h):",
+    alert_choose_category: "Wähle eine Kategorie.",
+    alert_presets_saved: "Voreinstellungen gespeichert",
+    title_delete: "Löschen",
+    btn_add_plain: "Hinzufügen",
+    res_piece_name_ph: "Raumname (z.B. Küche)",
+    res_piece_time_ph: "Zeit (h)",
+    err_name_time: "Name und Zeit erforderlich",
+    err_name_m2: "Name und m² erforderlich",
+    err_name_cap: "Name und Leistung erforderlich",
+    err_valid_name_time: "Gültiger Name und Zeit erforderlich",
+    err_nothing_add: "Nichts hinzuzufügen",
+    err_pdf_lib: "PDF-Bibliothek nicht verfügbar",
+    confirm_clear_all: "Alles löschen?",
+    confirm_reset_session: "Aktuelle Sitzung zurücksetzen?",
+    confirm_delete_cat: "Kategorie löschen?",
+    confirm_delete_item: "Element löschen?",
+    prompt_name: "Name",
+    prompt_time_h_short: "Zeit (h)",
+    prompt_qty: "Menge",
+    prompt_unit_time: "Zeit pro Einheit (h)",
+    prompt_pdf_name: "PDF-Dateiname:",
+    prompt_cat_name: "Kategoriename:",
+    prompt_item_name2: "Elementname:",
+    prompt_m2: "m²",
+    prompt_capacity: "Leistung (m²/h)",
+    prompt_time_per_unit: "Zeit pro Einheit (h)"}
+};
+
+let lang = localStorage.getItem('est_lang') || 'fr';
+
+function t(key, fallback){
+  const v = i18n[lang]?.[key];
+  return (v!==undefined && v!==null) ? v : (fallback!==undefined ? fallback : key);
+}
+
+// ✅ Alias to avoid bugs when local variables are named "t" (type name)
+function tr(key, fallback){
+  return t(key, fallback);
+}
+
+
+const L10N = {
+  en: {
+    type: {
+      "Fin de chantier": "End of construction",
+      "Fin de bail -": "End of lease (standard)",
+      "Fin de bail +": "End of lease (deep)",
+      "Vitres & Stores": "Windows & Blinds",
+      "Méthodes": "Methods",
+      "Entretien régulier - Administration": "Regular cleaning – Administration",
+      "Entretien régulier - Hôpital": "Regular cleaning – Hospital",
+      "Entretien régulier - Écoles": "Regular cleaning – Schools",
+      "Entretien régulier - Résidence": "Regular cleaning – Residence",
+      "Entretien régulier - Médico-social": "Regular cleaning – Social/Medical"
+    },
+    piece: {
+      "Cuisine": "Kitchen",
+      "Salle de bain": "Bathroom",
+      "WC": "Toilet",
+      "Salon / Séjour": "Living room",
+      "Chambre": "Bedroom",
+      "Fenêtres": "Windows",
+      "Couloir": "Hallway"
+    }
+  },
+  de: {
+    type: {
+      "Fin de chantier": "Bauendreinigung",
+      "Fin de bail -": "Umzugsreinigung (Standard)",
+      "Fin de bail +": "Umzugsreinigung (Intensiv)",
+      "Vitres & Stores": "Fenster & Storen",
+      "Méthodes": "Methoden",
+      "Entretien régulier - Administration": "Unterhaltsreinigung – Verwaltung",
+      "Entretien régulier - Hôpital": "Unterhaltsreinigung – Spital",
+      "Entretien régulier - Écoles": "Unterhaltsreinigung – Schulen",
+      "Entretien régulier - Résidence": "Unterhaltsreinigung – Wohnanlage",
+      "Entretien régulier - Médico-social": "Unterhaltsreinigung – Sozial/Medizin"
+    },
+    piece: {
+      "Cuisine": "Küche",
+      "Salle de bain": "Badezimmer",
+      "WC": "WC",
+      "Salon / Séjour": "Wohnzimmer",
+      "Chambre": "Schlafzimmer",
+      "Fenêtres": "Fenster",
+      "Couloir": "Flur"
+    }
+  }
+};
+
+function trTypeName(name){
+  return (L10N[lang] && L10N[lang].type && L10N[lang].type[name]) ? L10N[lang].type[name] : name;
+}
+function trPieceName(name){
+  return (L10N[lang] && L10N[lang].piece && L10N[lang].piece[name]) ? L10N[lang].piece[name] : name;
+}
+
+
+function setLang(l){
+  lang = l;
+  localStorage.setItem('est_lang', l);
+  translateAll();
+}
+
+function translateAll(){
+  // text
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k = el.getAttribute('data-i18n');
+    const v = i18n[lang]?.[k];
+    if(v!=null) el.textContent = v;
+  });
+  // html
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-html');
+    const v = i18n[lang]?.[k];
+    if(v!=null) el.innerHTML = v;
+  });
+
+  // titles
+  document.querySelectorAll('[data-i18n-title]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-title');
+    const v = i18n[lang]?.[k];
+    if(v!=null) el.setAttribute('title', v);
+  });
+
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el=>{
+    const k = el.getAttribute('data-i18n-placeholder');
+    const v = i18n[lang]?.[k];
+    if(v!=null) el.setAttribute('placeholder', v);
+  });
+
+  // legacy titles
+  const presetIcon = $('presetIcon');
+  if(presetIcon) presetIcon.title = i18n[lang].t_predefine;
+  const infoBtn = $('infoBtn');
+  if(infoBtn) infoBtn.title = i18n[lang].t_info;
+  const typesBtn = $('typesBtn');
+  if(typesBtn) typesBtn.title = i18n[lang].t_types;
+  const installBtn = $('installBtn');
+  if(installBtn) installBtn.title = i18n[lang].t_install;
+
+  // placeholders
+  const cn = $('clientName');
+  if(cn) cn.placeholder = i18n[lang].ph_client;
+  const rm = $('remarks');
+  if(rm) rm.placeholder = i18n[lang].ph_remarks;
+  const cpn = $('customPieceName');
+  if(cpn) cpn.placeholder = i18n[lang].ph_custom_name;
+  const cpt = $('customPieceTime');
+  if(cpt) cpt.placeholder = i18n[lang].ph_custom_time;
+  const cpq = $('customPieceQty');
+  if(cpq) cpq.placeholder = i18n[lang].ph_custom_qty;
+
+  translateTypeOptions();
+  translatePresetUI();
+
+  // lang select + html lang
+  const sel = $('langSelect');
+  if(sel) sel.value = lang;
+  document.documentElement.lang = lang;
+}
+
+
+function translateTypeOptions(){
+  const sel = document.getElementById('cleanType');
+  if(sel){
+    Array.from(sel.options).forEach(opt=>{
+      if(opt.value==='__custom__'){
+        // keep current label from i18n (btn_adjust)
+        opt.textContent = i18n[lang]?.btn_adjust || opt.textContent;
+      } else {
+        opt.textContent = trTypeName(opt.value);
+      }
+    });
+  }
+}
+
+function translatePresetUI(){
+  // Tabs in "Pré-définir pièces"
+  document.querySelectorAll('[data-tab]').forEach(btn=>{
+    const v = btn.getAttribute('data-tab');
+    if(v) btn.textContent = trTypeName(v);
+  });
+
+  // Any displayed standard piece names (lists)
+  document.querySelectorAll('.std-name').forEach(el=>{
+    const raw = el.getAttribute('data-raw-name') || el.textContent;
+    el.setAttribute('data-raw-name', raw);
+    el.textContent = trPieceName(raw);
+  });
+
+  // Any selects that list presets (m2h, etc.)
+  document.querySelectorAll('select').forEach(sel=>{
+    Array.from(sel.options).forEach(opt=>{
+      const raw = opt.getAttribute('data-raw-label');
+      if(raw) opt.textContent = raw; // will be rebuilt by renderers anyway
+    });
+  });
+}
+
+translateAll();
+
 const defaultPresets={
   "Fin de chantier":[{name:"Cuisine",time:3},{name:"Salle de bain",time:2},{name:"WC",time:0.5},{name:"Salon / Séjour",time:2.5},{name:"Chambre",time:1.8},{name:"Fenêtres",time:0.5}],
   "Fin de bail -":[{name:"Cuisine",time:4},{name:"Salle de bain",time:3},{name:"WC",time:1.5},{name:"Salon / Séjour",time:3},{name:"Chambre",time:2},{name:"Fenêtres",time:0.4}],
@@ -77,7 +719,7 @@ function renderResidencePieceList(){
   residencePiecesArr().map(normalizeResidencePiece).forEach((p,i)=>{
     const d=document.createElement('div');
     d.className='preset-item';
-    d.innerHTML=`<div><strong>${p.name}</strong><div><small>${(p.time||0)} h</small></div></div><div><button type="button" onclick="editResidencePiecePreset(${i})">✏️</button> <button type="button" onclick="removeResidencePiecePreset(${i})">🗑️</button></div>`;
+    d.innerHTML=`<div><strong>${trPieceName(p.name)}</strong><div><small>${(p.time||0)} h</small></div></div><div><button type="button" onclick="editResidencePiecePreset(${i})">✏️</button> <button type="button" onclick="removeResidencePiecePreset(${i})">🗑️</button></div>`;
     list.appendChild(d);
   });
 }
@@ -85,7 +727,7 @@ function renderResidencePieceList(){
 function addResidencePiecePreset(){
   const name = $('resPieceName')?.value.trim();
   const time = parseFloat($('resPieceTime')?.value);
-  if(!name || isNaN(time)) return alert('Nom et temps requis');
+  if(!name || isNaN(time)) return alert(tr('err_name_time','Nom et temps requis'));
   residencePiecesArr().push({ name, time:+time });
   $('resPieceName').value='';
   $('resPieceTime').value='';
@@ -94,9 +736,9 @@ function addResidencePiecePreset(){
 
 function editResidencePiecePreset(i){
   const p = normalizeResidencePiece(residencePiecesArr()[i]);
-  const nn = prompt('Nom', p.name);
+  const nn = prompt(tr('prompt_name','Nom'), p.name);
   if(!nn) return;
-  const nt = parseFloat(prompt('Temps (h)', p.time));
+  const nt = parseFloat(prompt(tr('prompt_time_h_short','Temps (h)'), p.time));
   if(isNaN(nt)) return;
   residencePiecesArr()[i] = { name: nn, time:+nt };
   renderResidencePieceList();
@@ -104,7 +746,7 @@ function editResidencePiecePreset(i){
 }
 
 function removeResidencePiecePreset(i){
-  if(!confirm('Supprimer?')) return;
+  if(!confirm(tr('confirm_delete','Supprimer ?'))) return;
   residencePiecesArr().splice(i,1);
   renderResidencePieceList();
   renderStandardList();
@@ -183,7 +825,7 @@ function renderPresetTabs(){
     const b=document.createElement('button');
     b.className='tab-btn' + ((s.name===current) ? ' active' : '');
     b.setAttribute('data-tab', s.name);
-    b.textContent=s.name;
+    b.textContent=trTypeName(s.name);
     b.onclick=()=>switchTab(s.name);
     cont.appendChild(b);
   });
@@ -232,7 +874,7 @@ function renderPresetList(){
     } else {
       sub = `<div><small>${(p.time||0)} h</small></div>`;
     }
-    d.innerHTML=`<div><strong>${p.name}</strong>${sub}</div><div><button onclick="editPreset('${t}',${i})">✏️</button> <button onclick="removePreset('${t}',${i})">🗑️</button></div>`;
+    d.innerHTML=`<div><strong>${trPieceName(p.name)}</strong>${sub}</div><div><button onclick="editPreset('${t}',${i})">✏️</button> <button onclick="removePreset('${t}',${i})">🗑️</button></div>`;
     list.appendChild(d);
   });
   renderResidencePieceList();
@@ -245,7 +887,7 @@ function addPreset(){
   const isM=isM2HTypeForPresets(t);
   if(isM){
     const m2=parseFloat($('presetM2').value);
-    if(!name||isNaN(m2)||m2<=0) return alert('Nom et M² requis');
+    if(!name||isNaN(m2)||m2<=0) return alert(tr('err_name_m2','Nom et M² requis'));
     presets[t]=presets[t]||[];
     presets[t].push({name,m2:+m2});
     $('presetName').value='';
@@ -260,13 +902,13 @@ function addPreset(){
     presets[t]=presets[t]||[];
     if(k==='unit'){
       const time=parseFloat($('presetTime').value);
-      if(!name||isNaN(time)) return alert('Nom et temps requis');
+      if(!name||isNaN(time)) return alert(tr('err_name_time','Nom et temps requis'));
       presets[t].push({name, kind:'unit', time:+time});
       $('presetName').value='';
       $('presetTime').value='';
     } else {
       const cap=parseFloat($('presetM2').value);
-      if(!name||isNaN(cap)||cap<=0) return alert('Nom et capacité requis');
+      if(!name||isNaN(cap)||cap<=0) return alert(tr('err_name_cap','Nom et capacité requis'));
       presets[t].push({name, kind:'m2', cap:+cap});
       $('presetName').value='';
       $('presetM2').value='';
@@ -278,7 +920,7 @@ function addPreset(){
 
   // resto (comportement ancien)
   const time=parseFloat($('presetTime').value);
-  if(!name||isNaN(time)) return alert('Nom et temps requis');
+  if(!name||isNaN(time)) return alert(tr('err_name_time','Nom et temps requis'));
   presets[t]=presets[t]||[];
   presets[t].push({name,time:+time});
   $('presetName').value='';
@@ -289,26 +931,26 @@ function addPreset(){
 function editPreset(t,i){
   const isM=isM2HTypeForPresets(t);
   const p=normalizePresetItem(t,presets[t][i]);
-  const nn=prompt('Nom / Name',p.name);
+  const nn=prompt(tr('prompt_name','Name'),p.name);
   if(!nn) return;
   if(isM){
-    const nm2=parseFloat(prompt('M²',p.m2));
+    const nm2=parseFloat(prompt(tr('prompt_m2','m²'),p.m2));
     if(isNaN(nm2)||nm2<=0) return;
     presets[t][i]={name:nn,m2:+nm2};
   }
   else if(isVitresStoresTab(t)){
     if(p.kind==='m2'){
-      const ncap=parseFloat(prompt('Capacité (m²/h)', String(p.cap||0)));
+      const ncap=parseFloat(prompt(tr('prompt_capacity','Capacité (m²/h)'), String(p.cap||0)));
       if(isNaN(ncap)||ncap<=0) return;
       presets[t][i]={name:nn, kind:'m2', cap:+ncap};
     } else {
-      const nt=parseFloat(prompt('Temps par unité (h)', String(p.time||0)));
+      const nt=parseFloat(prompt(tr('prompt_time_per_unit','Temps par unité (h)'), String(p.time||0)));
       if(isNaN(nt)) return;
       presets[t][i]={name:nn, kind:'unit', time:+nt};
     }
   }
   else {
-    const nt=parseFloat(prompt('Temps (h) / Time (h)',p.time));
+    const nt=parseFloat(prompt(tr('prompt_time_h_short','Time (h)'),p.time));
     if(isNaN(nt)) return;
     presets[t][i]={name:nn,time:+nt};
   }
@@ -318,7 +960,7 @@ function editPreset(t,i){
   refreshVitresSelects();
 }
 function removePreset(t,i){
-  if(!confirm('Supprimer?'))return;
+  if(!confirm(tr('confirm_delete','Supprimer ?')))return;
   presets[t].splice(i,1);
   renderPresetList();
   renderStandardList();
@@ -326,14 +968,14 @@ function removePreset(t,i){
 }
 function savePresets(){
   localStorage.setItem('est_presets_v4',JSON.stringify(presets));
-  alert(lang==='fr'?'Pré-définitions enregistrées':'Presets saved');
+  alert(tr('alert_presets_saved','Pré-définitions enregistrées'));
   closePresets();
   renderStandardList();
   refreshMethodSelect();
   refreshVitresSelects();
 }
 function clearAllPresets(){
-  if(!confirm('Tout effacer?'))return;
+  if(!confirm(tr('confirm_clear_all','Tout effacer?')))return;
   presets=JSON.parse(JSON.stringify(defaultPresets));
   localStorage.setItem('est_presets_v4',JSON.stringify(presets));
   renderPresetList();
@@ -413,7 +1055,7 @@ function addM2HLine(){
     <select class="m2h-method"></select>
     <input class="m2h-surface" type="number" min="0" step="0.1" placeholder="Surface (m²)">
     <input class="m2h-hours" type="number" readonly placeholder="H">
-    <button class="m2h-del" type="button" title="Supprimer">🗑️</button>
+    <button class="m2h-del" type="button" title="${tr('title_delete','Supprimer')}">🗑️</button>
   `;
 
   line.querySelector('.m2h-del').addEventListener('click', ()=>{
@@ -581,7 +1223,7 @@ function renderStandardList(){
     _stdRendered.forEach((p,i)=>{
       const d=document.createElement('div');
       d.className='std-item';
-      d.innerHTML=`<span class="std-name">${p.name}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>Ajouter</button>`;
+      d.innerHTML=`<span class="std-name">${trPieceName(p.name)}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>${tr('btn_add_plain','Ajouter')}</button>`;
       c.appendChild(d);
     });
     updateTotal();
@@ -610,7 +1252,7 @@ function renderStandardList(){
   _stdRendered.forEach((p,i)=>{
     const d=document.createElement('div');
     d.className='std-item';
-    d.innerHTML=`<span class="std-name">${p.name}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>Ajouter</button>`;
+    d.innerHTML=`<span class="std-name">${trPieceName(p.name)}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>${tr('btn_add_plain','Ajouter')}</button>`;
     c.appendChild(d);
   });
   updateTotal();
@@ -625,7 +1267,7 @@ function renderStandardListFromBiblio(t, container){
     _stdRendered.forEach((p,i)=>{
       const d=document.createElement('div');
       d.className='std-item';
-      d.innerHTML=`<span class="std-name">${p.name}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>Ajouter</button>`;
+      d.innerHTML=`<span class="std-name">${trPieceName(p.name)}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${i})'>${tr('btn_add_plain','Ajouter')}</button>`;
       container.appendChild(d);
     });
     return;
@@ -655,7 +1297,7 @@ function renderStandardListFromBiblio(t, container){
 
       const d=document.createElement('div');
       d.className='std-item';
-      d.innerHTML=`<span class="std-name">${p.name}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${idx})'>Ajouter</button>`;
+      d.innerHTML=`<span class="std-name">${trPieceName(p.name)}</span><input class="qty" type="number" min="1" value="1"><button onclick='addStandard(${idx})'>${tr('btn_add_plain','Ajouter')}</button>`;
       inner.appendChild(d);
     });
 
@@ -681,7 +1323,7 @@ function addStandard(i){
   pieces.push({name:p.name,timePerUnit:p.time,qty:qty,subtotal:+(p.time*qty).toFixed(2)});
   updateList();
 }
-function addCustomPiece(){const name=$('customPieceName').value.trim();const time=parseFloat($('customPieceTime').value);const qty=parseInt($('customPieceQty').value)||1;if(!name||isNaN(time))return alert('Nom et temps valides requis');pieces.push({name,timePerUnit:time,qty:qty,subtotal:+(time*qty).toFixed(2)});$('customPieceName').value='';$('customPieceTime').value='';$('customPieceQty').value='1';updateList();}
+function addCustomPiece(){const name=$('customPieceName').value.trim();const time=parseFloat($('customPieceTime').value);const qty=parseInt($('customPieceQty').value)||1;if(!name||isNaN(time))return alert(tr('err_valid_name_time','Nom et temps valides requis'));pieces.push({name,timePerUnit:time,qty:qty,subtotal:+(time*qty).toFixed(2)});$('customPieceName').value='';$('customPieceTime').value='';$('customPieceQty').value='1';updateList();}
 
 // ================================
 // ✅ Vitres & Stores : Unités + M² (difficulté 0/20/30)
@@ -766,7 +1408,7 @@ function addVitresToSession(){
   const hU = (tUnit>0 && (qNorm>0||qDiff>0)) ? hoursUnitsWithDifficulty(tUnit,qNorm,qDiff,cU) : 0;
   const hM = (cap>0 && (mNorm>0||mDiff>0)) ? hoursM2WithDifficulty(mNorm,mDiff,cap,cM) : 0;
 
-  if(hU<=0 && hM<=0) return alert(lang==='fr'?'Rien à ajouter':'Nothing to add');
+  if(hU<=0 && hM<=0) return alert(tr('err_nothing_add','Rien à ajouter'));
 
   if(hU>0){
     const baseName = uPreset ? `Unités • ${uPreset}` : 'Unités';
@@ -783,7 +1425,7 @@ function addVitresToSession(){
   ['vit_u_norm','vit_u_diff','vit_m2_norm','vit_m2_diff'].forEach(id=>{ if($(id)) $(id).value=''; });
   updateList();
 }
-function updateList(){const list=$('pieceList');list.innerHTML='';total=0;pieces.forEach((p,i)=>{total+=p.subtotal;const li=document.createElement('li');li.innerHTML=`<div><strong>${p.name}</strong><br><small>${p.timePerUnit}h × ${p.qty} = ${p.subtotal}h</small></div><div class='piece-actions'><button onclick='quickEdit(${i})'>✏️</button><button onclick='removePiece(${i})'>🗑️</button></div>`;list.appendChild(li);});updateTotal();}
+function updateList(){const list=$('pieceList');list.innerHTML='';total=0;pieces.forEach((p,i)=>{total+=p.subtotal;const li=document.createElement('li');li.innerHTML=`<div><strong>${trPieceName(p.name)}</strong><br><small>${p.timePerUnit}h × ${p.qty} = ${p.subtotal}h</small></div><div class='piece-actions'><button onclick='quickEdit(${i})'>✏️</button><button onclick='removePiece(${i})'>🗑️</button></div>`;list.appendChild(li);});updateTotal();}
 function formatHoursClock(h){
   const sign = h<0 ? '-' : '';
   h = Math.abs(h||0);
@@ -811,10 +1453,10 @@ function updateTotal(){
   if($('teamTotal')) $('teamTotal').textContent = totalFinal.toFixed(2) + ' (' + formatHoursClock(totalFinal) + ')';
   if($('teamPeople')) $('teamPeople').textContent=people.toFixed(2);
 }
-function quickEdit(i){const p=pieces[i];const q=parseInt(prompt('Quantité',p.qty));const t=parseFloat(prompt('Temps unitaire (h)',p.timePerUnit));if(isNaN(q)||isNaN(t))return;p.qty=q;p.timePerUnit=t;p.subtotal=+(q*t).toFixed(2);updateList();}
+function quickEdit(i){const p=pieces[i];const q=parseInt(prompt(tr('prompt_qty','Quantité'),p.qty));const t=parseFloat(prompt(tr('prompt_unit_time','Temps unitaire (h)'),p.timePerUnit));if(isNaN(q)||isNaN(t))return;p.qty=q;p.timePerUnit=t;p.subtotal=+(q*t).toFixed(2);updateList();}
 function removePiece(i){pieces.splice(i,1);updateList();}
 function resetForm(){
-  if(!confirm('Réinitialiser la session actuelle?'))return;
+  if(!confirm(tr('confirm_reset_session','Réinitialiser la session actuelle?')))return;
   pieces=[];total=0;
   $('clientName').value='';
   $('cleaningDate').value='';
@@ -832,7 +1474,7 @@ function generatePDF(){
   const remarks=$('remarks').value||'';
   const exItems=getM2HExtraItems();
   const exH=exItems.reduce((s,it)=>s+it.hours,0);
-  if(!(window.jspdf&&window.jspdf.jsPDF))return alert('PDF library not available');
+  if(!(window.jspdf&&window.jspdf.jsPDF))return alert(tr('err_pdf_lib','PDF library not available'));
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
   doc.setFillColor(30,144,255);doc.circle(20,18,6,'F');
@@ -886,7 +1528,7 @@ function generatePDF(){
   doc.setFontSize(9);
   doc.text(remarks||'-',14,y+32);
   const def='Estimation_Nettoyage_'+(date||new Date().toISOString().slice(0,10))+'.pdf';
-  const fname=prompt(lang==='fr'?'Nom du fichier PDF:':'PDF file name:',def)||def;
+  const fname=prompt(tr('prompt_pdf_name','Nom du fichier PDF:'),def)||def;
   doc.save(fname);
 }
 
@@ -930,7 +1572,7 @@ function refreshMethodSelect(){
       opts.forEach(p=>{
         const opt=document.createElement('option');
         opt.value=p.name;
-        opt.textContent=`${p.name} (${p.m2||0} m²)`;
+        opt.textContent=`${trPieceName(p.name)} (${p.m2||0} m²)`;
         sel.appendChild(opt);
       });
       if(current && opts.find(o=>o.name===current)) sel.value=current;
@@ -1061,7 +1703,7 @@ function b_renderCats(){
     edit.textContent = '✏️';
     edit.className = 'btn small';
     edit.onclick = ()=>{
-      const nn = prompt('Nom catégorie:', cat.label);
+      const nn = prompt(tr('prompt_cat_name','Nom catégorie:'), cat.label);
       if(!nn) return;
       cat.label = nn.trim();
       saveBiblio();
@@ -1073,7 +1715,7 @@ function b_renderCats(){
     del.textContent = '🗑';
     del.className = 'btn small danger';
     del.onclick = ()=>{
-      if(!confirm('Supprimer catégorie ?')) return;
+      if(!confirm(tr('confirm_delete_cat','Supprimer catégorie ?'))) return;
       tab.categories = tab.categories.filter(c=>c.id!==cat.id);
       if(b_currentCatId===cat.id) b_currentCatId = tab.categories[0]?.id || null;
       saveBiblio();
@@ -1119,9 +1761,9 @@ function b_renderItems(){
     edit.textContent='✏️';
     edit.className='btn small';
     edit.onclick = ()=>{
-      const nn = prompt('Nom item:', it.label);
+      const nn = prompt(tr('prompt_item_name2','Nom item:'), it.label);
       if(!nn) return;
-      const nt = parseFloat(prompt('Temps (h):', String(it.time ?? 0)));
+      const nt = parseFloat(prompt(tr('prompt_time_h','Temps (h):'), String(it.time ?? 0)));
       if(isNaN(nt)) return;
       it.label = nn.trim();
       it.time = nt;
@@ -1134,7 +1776,7 @@ function b_renderItems(){
     del.textContent='🗑';
     del.className='btn small danger';
     del.onclick = ()=>{
-      if(!confirm('Supprimer item ?')) return;
+      if(!confirm(tr('confirm_delete_item','Supprimer item ?'))) return;
       cat.items = cat.items.filter(x=>x.id!==it.id);
       saveBiblio();
       b_renderAll();
@@ -1182,7 +1824,7 @@ function b_renderAll(){
 
 function biblioAddCategory(){
   const tab = b_getTabObj();
-  const name = prompt('Nom nouvelle catégorie:');
+  const name = prompt(tr('prompt_new_category','Nom nouvelle catégorie:'));
   if(!name) return;
   tab.categories.push({ id: b_uid('cat'), label: name.trim(), items: [] });
   b_currentCatId = tab.categories.at(-1).id;
@@ -1192,10 +1834,10 @@ function biblioAddCategory(){
 
 function biblioAddItem(){
   const cat = b_getCatObj();
-  if(!cat) return alert('Choisis une catégorie.');
-  const label = prompt('Nom item:');
+  if(!cat) return alert(tr('alert_choose_category','Choisis une catégorie.'));
+  const label = prompt(tr('prompt_item_name','Nom item:'));
   if(!label) return;
-  const time = parseFloat(prompt('Temps (h):', '0'));
+  const time = parseFloat(prompt(tr('prompt_time_h','Temps (h):'), '0'));
   if(isNaN(time)) return;
   cat.items.push({ id: b_uid('it'), label: label.trim(), time });
   saveBiblio();
@@ -1264,7 +1906,7 @@ function syncTypeSelectFromServices(){
     if(!opt){
       opt = document.createElement('option');
       opt.value = s.name;
-      opt.textContent = s.name;
+      opt.textContent = trTypeName(s.name);
       const custom = sel.querySelector('option[value="__custom__"]');
       if(custom) sel.insertBefore(opt, custom);
       else sel.appendChild(opt);
@@ -1316,8 +1958,8 @@ try{
 
 function tmCreate(){
   const name = (document.getElementById('tm_name')?.value||'').trim();
-  if(!name) return alert('Nom requis');
-  if(_services.find(s=>s.name===name)) return alert('Existe déjà');
+  if(!name) return alert(tr('tm_bad_name','Nom requis'));
+  if(_services.find(s=>s.name===name)) return alert(tr('tm_exists','Existe déjà'));
   // create using existing presets workflow
   if(typeof createCustomType === 'function') createCustomType(name);
 
@@ -1337,7 +1979,7 @@ function tmCreate(){
   tmRenderList();
   const sel = document.getElementById('cleanType');
   if(sel && Array.from(sel.options).some(o=>o.value===name)){ sel.value=name; onTypeChange(); }
-  alert('Type créé');
+  alert(tr('tm_created','Type créé'));
 }
 
 function tmRenderList(){
@@ -1355,17 +1997,18 @@ function tmRenderList(){
     row.className='tm-item';
     const left=document.createElement('div');
     left.className='tm-left';
-    left.innerHTML = `<strong>${s.name}</strong><small>${s.locked?'Type de base':'Personnalisé'}</small>`;
+    const displayName = s.locked ? trTypeName(s.name) : s.name;
+    left.innerHTML = `<strong>${displayName}</strong><small>${s.locked? tr('tm_lbl_base','Type de base') : tr('tm_lbl_custom','Personnalisé')}</small>`;
     const actions=document.createElement('div');
     actions.className='tm-actions';
 
     const btnRename=document.createElement('button');
     btnRename.className='btn white small';
-    btnRename.textContent='Renommer';
+    btnRename.textContent=tr('tm_btn_rename','Renommer');
     btnRename.onclick=()=>{
-      const nn=prompt('Nouveau nom', s.name);
+      const nn=prompt(tr('tm_prompt_new_name','Nouveau nom'), s.name);
       if(!nn) return;
-      if(_services.find(x=>x.name===nn)) return alert('Ce nom existe déjà');
+      if(_services.find(x=>x.name===nn)) return alert(tr('tm_name_exists','Ce nom existe déjà'));
       // rename in select
       Array.from(sel.options).forEach(o=>{ if(o.value===s.name){ o.value=nn; o.textContent=nn; }});
       // rename presets object
@@ -1385,7 +2028,7 @@ function tmRenderList(){
 
     const btnToggle=document.createElement('button');
     btnToggle.className='btn white small';
-    btnToggle.textContent = (s.active===false)?'Activer':'Désactiver';
+    btnToggle.textContent = (s.active===false)?tr('tm_btn_enable','Activer'):tr('tm_btn_disable','Désactiver');
     btnToggle.onclick=()=>{
       s.active = (s.active===false)?true:false;
       // hide/show in select
@@ -1396,10 +2039,10 @@ function tmRenderList(){
 
     const btnDel=document.createElement('button');
     btnDel.className='btn white small danger';
-    btnDel.textContent='Supprimer';
+    btnDel.textContent=tr('tm_btn_delete','Supprimer');
     btnDel.onclick=()=>{
-      if(s.locked) return alert('Impossible: type de base');
-      if(!confirm('Supprimer définitivement ?')) return;
+      if(s.locked) return alert(tr('tm_cant_delete_base','Impossible: type de base'));
+      if(!confirm(tr('tm_confirm_delete','Supprimer définitivement ?'))) return;
       Array.from(sel.options).forEach(o=>{ if(o.value===s.name) o.remove(); });
       if(typeof presets !== 'undefined' && presets[s.name]){
         delete presets[s.name];
