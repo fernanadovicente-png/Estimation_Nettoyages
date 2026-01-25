@@ -1,4 +1,4 @@
-const CACHE_NAME='est-cache-v6';
+const CACHE_NAME = "cleanest-v200";
 const ASSETS=[
   './',
   './index.html',
