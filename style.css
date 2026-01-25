@@ -166,3 +166,30 @@ textarea{min-height:80px}
     touch-action: pan-y !important;
   }
 }
+@media (max-width: 640px){
+
+  /* ❌ não bloquear pan-x em tudo */
+  .modal-content *{
+    touch-action: auto !important;
+  }
+
+  /* ✅ só a lista precisa pan-y */
+  .modal-scroll,
+  .preset-list,
+  .biblio-items,
+  .biblio-right{
+    touch-action: pan-y !important;
+  }
+
+  /* ✅ a barra de categorias/tabs precisa pan-x */
+  .biblio-left,
+  .biblio-tabs,
+  .tabs,
+  .tab-row{
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-x !important;
+  }
+}
