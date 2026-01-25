@@ -1051,12 +1051,19 @@ function addM2HLine(){
 
   const line=document.createElement('div');
   line.className='m2h-line';
+  
   line.innerHTML=`
     <select class="m2h-method"></select>
     <input class="m2h-surface" type="number" min="0" step="0.1" placeholder="Surface (m²)">
     <input class="m2h-hours" type="number" readonly placeholder="H">
+    <button class="m2h-add" type="button" title="${tr('btn_add_plain','Ajouter')}">➕</button>
     <button class="m2h-del" type="button" title="${tr('title_delete','Supprimer')}">🗑️</button>
   `;
+
+
+  line.querySelector('.m2h-add').addEventListener('click', ()=>{
+    addM2HLineToSession(line);
+  });
 
   line.querySelector('.m2h-del').addEventListener('click', ()=>{
     line.remove();
@@ -1089,6 +1096,39 @@ function updateM2HLine(line){
   out.value = h>0 ? h.toFixed(2) : '';
 }
 
+
+function addM2HLineToSession(line){
+  const t=$('cleanType')?.value||'';
+  if(!isM2HType(t)) return;
+  updateM2HLine(line);
+
+  const sel=line.querySelector('.m2h-method');
+  const surf=line.querySelector('.m2h-surface');
+  const out=line.querySelector('.m2h-hours');
+  const name=(sel?.value||'').trim();
+  const surface=parseFloat(surf?.value||'0')||0;
+  const hours=parseFloat(out?.value||'0')||0;
+
+  if(!name || surface<=0 || hours<=0){
+    alert(tr('err_fill_surface','Remplis la surface et choisis une méthode.'));
+    return;
+  }
+
+  // ✅ Ajouter à la session (comme Pièces/Vitres)
+  const displayName = `${name} (${surface} m²)`;
+  pieces.push({
+    name: displayName,
+    timePerUnit: (+hours.toFixed(2)),
+    qty: 1,
+    subtotal: (+hours.toFixed(2))
+  });
+
+  // reset line for next entry
+  if(surf) surf.value='';
+  if(out) out.value='';
+  updateList();
+}
+
 function getM2HExtraItems(){
   const t=$('cleanType')?.value||'';
   if(!isM2HType(t)) return [];
@@ -1109,17 +1149,26 @@ function getM2HExtraItems(){
 }
 
 function extraHours(){
-  return getM2HExtraItems().reduce((s,it)=>s+it.hours,0);
+  // ✅ Méthodes/M² ne comptent que quand ajoutés à la session
+  return 0;
 }
 
 function toggleM2H(){
   const t=$('cleanType').value;
   const row=$('m2hRow');
   if(!row) return;
-  row.classList.toggle('hidden', !isM2HType(t));
+  const on = isM2HType(t);
+  row.classList.toggle('hidden', !on);
+
+  // ✅ no modo Méthodes/M², não mostrar "Ajuster" (fica como Pièces/Vitres)
+  const btnAdj = $('toggleAdjuster');
+  const adj = $('adjuster');
+  if(btnAdj) btnAdj.classList.toggle('hidden', on);
+  if(adj) adj.classList.toggle('hidden', on);
+
   const title=$('m2hTitle');
   if(title) title.textContent = t==='Méthodes' ? 'Méthodes' : 'Entretien régulier';
-  if(isM2HType(t)) ensureOneM2HLine();
+  if(on) ensureOneM2HLine();
   refreshMethodSelect();
   updateTotal();
 }
