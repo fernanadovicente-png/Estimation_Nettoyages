@@ -146,3 +146,52 @@ textarea{min-height:80px}
 .type-manager .row{display:flex;gap:10px;flex-wrap:wrap}
 .type-manager input,.type-manager select{flex:1;min-width:180px}
 .type-manager .check{display:flex;align-items:center;gap:8px}
+/* ✅ 100+ peças sem travar (mobile) */
+@media (max-width: 640px){
+
+  /* Modal/caixa ocupa o ecrã mas deixa o conteúdo scrollar */
+  .modal-content,
+  .popup-content,
+  .library-modal{
+    width: 95vw !important;
+    height: 92vh !important;
+    max-height: 92vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* ✅ área da lista: scroll forte */
+  .modal-body,
+  .popup-body,
+  .library-body,
+  .library-right,
+  .predefs-list,
+  .pieces-list,
+  .methods-list,
+  #predefinitionsList,
+  #selectedPieces,
+  #selectedMethods{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    max-height: 70vh !important;
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    padding-bottom: 80px !important; /* espaço para botões em baixo */
+  }
+
+  /* ✅ linhas leves para performance */
+  .preset-row,
+  .piece-row{
+    padding: 8px 10px !important;
+  }
+
+  /* ✅ touch scroll sem bloquear */
+  .library-right *,
+  .predefs-list *,
+  .pieces-list *,
+  .methods-list *{
+    touch-action: pan-y !important;
+  }
+}
